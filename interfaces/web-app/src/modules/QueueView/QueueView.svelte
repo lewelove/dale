@@ -5,11 +5,11 @@ import { view } from "../../library/view.svelte.ts";
 import { nav } from "../../navigation.svelte.ts";
 import { deriveColorTokens } from "../../colors.svelte.ts";
 
-import TracklistPanel from "./TracklistPanel.svelte";
-import ControlPanel from "./ControlPanel.svelte";
 import BackgroundShader from "./BackgroundShader.svelte";
 import NavigationBar from "../NavigationBar.svelte";
 import CoverPanel from "./CoverPanel.svelte";
+import TrackPanel from "./TrackPanel.svelte";
+import QueuePanel from "./QueuePanel.svelte";
 import Sidebar from "./Sidebar.svelte";
 
 let activeId = $derived(player.currentAlbumId);
@@ -60,7 +60,7 @@ $effect(() => {
   <div class="queue-layout">
     <div class="left-wing">
       <NavigationBar variant="transparent" />
-      <ControlPanel />
+      <TrackPanel />
     </div>
 
     <div class="center-wing" bind:clientWidth={moduleWidth}>
@@ -68,7 +68,7 @@ $effect(() => {
     </div>
 
     <div class="right-wing">
-      <TracklistPanel />
+      <QueuePanel />
       <Sidebar {hasPalette} />
     </div>
   </div>
@@ -92,7 +92,14 @@ $effect(() => {
   position: relative;
 }
 
-.left-wing,
+.left-wing {
+  flex: 1 1 0%;
+  display: flex;
+  min-width: 300px;
+  height: 100%;
+  flex-direction: row;
+}
+
 .right-wing {
   flex: 1 1 0%;
   display: flex;
