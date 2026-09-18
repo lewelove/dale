@@ -3,18 +3,11 @@ use crate::models::{CoverDeleteMode, CoverStatus, DiskCover, TagDeleteMode, Trac
 use anyhow::{Context, Result};
 use base64::Engine;
 use base64::engine::general_purpose::URL_SAFE_NO_PAD;
-use lofty::TextEncoding;
 use lofty::config::{ParseOptions, WriteOptions};
-use lofty::id3::v2::{
-    Frame, FrameId, Id3v2Tag, TextInformationFrame, UniqueFileIdentifierFrame,
-    UnsynchronizedTextFrame,
-};
 use lofty::picture::{Picture, PictureType};
 use lofty::prelude::*;
 use lofty::probe::Probe;
-use lofty::tag::items::Timestamp;
 use lofty::tag::{ItemKey, ItemValue, Tag, TagType};
-use std::borrow::Cow;
 use std::collections::{HashMap, HashSet};
 use std::fs::File;
 use std::path::Path;
@@ -127,139 +120,7 @@ pub fn resolve_cover_status(
     Ok(CoverStatus::Preserve)
 }
 
-fn apply_item_to_id3v2(id3v2: &mut Id3v2Tag, key: ItemKey, val: &str) {
-    match key {
-        ItemKey::TrackNumber => {
-            id3v2.set_track(val.parse().unwrap_or(0));
-        }
-        ItemKey::TrackTotal => {
-            id3v2.set_track_total(val.parse().unwrap_or(0));
-        }
-        ItemKey::DiscNumber => {
-            id3v2.set_disk(val.parse().unwrap_or(0));
-        }
-        ItemKey::DiscTotal => {
-            id3v2.set_disk_total(val.parse().unwrap_or(0));
-        }
-        ItemKey::Comment => {
-            id3v2.set_comment(val.to_string());
-        }
-        ItemKey::Lyrics | ItemKey::UnsyncLyrics => {
-            let frame = Frame::UnsynchronizedText(UnsynchronizedTextFrame::new(
-                TextEncoding::UTF8,
-                *b"eng",
-                "",
-                val.to_string(),
-            ));
-            id3v2.insert(frame);
-        }
-        ItemKey::MusicBrainzRecordingId => {
-            let frame = Frame::UniqueFileIdentifier(UniqueFileIdentifierFrame::new(
-                "http://musicbrainz.org",
-                val.as_bytes().to_vec(),
-            ));
-            id3v2.insert(frame);
-        }
-        ItemKey::RecordingDate | ItemKey::Year => {
-            if let Ok(ts) = val.parse::<Timestamp>() {
-                id3v2.set_date(ts);
-            } else {
-                id3v2.insert(Frame::Text(TextInformationFrame::new(
-                    FrameId::Valid(Cow::Borrowed("TDRC")),
-                    TextEncoding::UTF8,
-                    val.to_string(),
-                )));
-            }
-        }
-        ItemKey::Bpm | ItemKey::IntegerBpm => {
-            let bpm_str = val.parse::<u16>().map_or_else(
-                |_| {
-                    val.parse::<f32>().map_or_else(
-                        |_| "0".to_string(),
-                        |f| {
-                            if f.is_finite() && f > 0.0 {
-                                format!("{:.0}", f.round())
-                            } else {
-                                "0".to_string()
-                            }
-                        },
-                    )
-                },
-                |n| n.to_string(),
-            );
-            let frame_id = FrameId::Valid(Cow::Borrowed("TBPM"));
-            id3v2.insert(Frame::Text(TextInformationFrame::new(
-                frame_id,
-                TextEncoding::UTF8,
-                bpm_str,
-            )));
-        }
-        other => {
-            if let Some(mapped) = other.map_key(TagType::Id3v2) {
-                if mapped.len() == 4 {
-                    let frame_id = FrameId::Valid(Cow::Borrowed(mapped));
-                    id3v2.insert(Frame::Text(TextInformationFrame::new(
-                        frame_id,
-                        TextEncoding::UTF8,
-                        val.to_string(),
-                    )));
-                } else {
-                    id3v2.insert_user_text(mapped.to_string(), val.to_string());
-                }
-            }
-        }
-    }
-}
-
-fn apply_id3v2_tags(
-    path: &Path,
-    target_tags: &HashMap<ItemKey, String>,
-    new_picture: Option<&Picture>,
-    delete_tags: TagDeleteMode,
-    delete_covers: CoverDeleteMode,
-) -> Result<()> {
-    let (existing_tag, _) = read_file_tag(path)?;
-    let mut id3v2 = Id3v2Tag::new();
-
-    if delete_tags == TagDeleteMode::PreserveOther {
-        let existing_id3v2: Id3v2Tag = existing_tag.clone().into();
-        for frame in existing_id3v2 {
-            if !matches!(frame, Frame::Picture(_)) {
-                id3v2.insert(frame);
-            }
-        }
-    }
-
-    for (&k, v) in target_tags {
-        apply_item_to_id3v2(&mut id3v2, k, v);
-    }
-
-    if let Some(pic) = new_picture {
-        if delete_covers == CoverDeleteMode::PreserveOther {
-            for existing_pic in existing_tag.pictures() {
-                if existing_pic.pic_type() != PictureType::CoverFront {
-                    id3v2.insert_picture(existing_pic.clone());
-                }
-            }
-        }
-        id3v2.insert_picture(pic.clone());
-    } else if delete_covers == CoverDeleteMode::DeleteOther {
-        for existing_pic in existing_tag.pictures() {
-            if existing_pic.pic_type() == PictureType::CoverFront {
-                id3v2.insert_picture(existing_pic.clone());
-            }
-        }
-    } else {
-        for existing_pic in existing_tag.pictures() {
-            id3v2.insert_picture(existing_pic.clone());
-        }
-    }
-
-    id3v2.save_to_path(path, WriteOptions::default())?;
-    Ok(())
-}
-
-fn apply_generic_tags(
+fn apply_tags_and_cover(
     path: &Path,
     mut tag: Tag,
     target_tags: &HashMap<ItemKey, String>,
@@ -278,7 +139,11 @@ fn apply_generic_tags(
     }
 
     for (k, v) in target_tags {
-        tag.insert_text(*k, v.clone());
+        let write_key = match (*k, tag.tag_type()) {
+            (ItemKey::Lyrics, TagType::Id3v2) => ItemKey::UnsyncLyrics,
+            (key, _) => key,
+        };
+        tag.insert_text(write_key, v.clone());
     }
 
     if let Some(pic) = new_picture {
@@ -303,28 +168,6 @@ fn apply_generic_tags(
 
     tag.save_to_path(path, WriteOptions::default())?;
     Ok(())
-}
-
-fn apply_tags_and_cover(
-    path: &Path,
-    tag: Tag,
-    target_tags: &HashMap<ItemKey, String>,
-    new_picture: Option<&Picture>,
-    delete_tags: TagDeleteMode,
-    delete_covers: CoverDeleteMode,
-) -> Result<()> {
-    if tag.tag_type() == TagType::Id3v2 {
-        apply_id3v2_tags(path, target_tags, new_picture, delete_tags, delete_covers)
-    } else {
-        apply_generic_tags(
-            path,
-            tag,
-            target_tags,
-            new_picture,
-            delete_tags,
-            delete_covers,
-        )
-    }
 }
 
 pub fn write_tasks(

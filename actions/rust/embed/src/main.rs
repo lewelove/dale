@@ -3,6 +3,8 @@ mod diff;
 mod mapping;
 mod models;
 mod tag;
+#[cfg(test)]
+mod tests;
 
 use anyhow::Result;
 use models::{AutoMode, CliOptions, CoverDiffDisplay, CoverStatus};

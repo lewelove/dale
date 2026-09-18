@@ -48,7 +48,7 @@ image = "0.25.9"
 indexmap = { version = "2.13.0", features = ["serde"] }
 indicatif = "0.18.4"
 kmeans_colors = "0.7.1"
-lofty = "0.25.1"
+lofty = "0.25.2"
 log = "0.4.29"
 mlua = { version = "0.12.0", features = ["luajit", "serialize", "vendored"] }
 mpd_client = "1.4.1"
