@@ -6,90 +6,101 @@ mod writer;
 use anyhow::{Context, Result};
 use clap::Parser;
 use models::{
-    ExecutionPlan, OverwriteMode, TargetFlags, TargetUrl, parse_musicbrainz_url,
+    EntityType, FetchPlan, FetchTarget, OverwriteMode, TargetKind, extract_mbid,
+    is_valid_uuid, parse_url,
 };
 use std::path::PathBuf;
 
-#[derive(Parser)]
+#[derive(Parser, Debug)]
 #[command(author, version, about = "Fetch raw JSON responses from MusicBrainz")]
 struct Cli {
-    #[arg(value_name = "URL")]
-    url_pos: Option<String>,
+    #[arg(long = "url", group = "input", value_name = "URL")]
+    url: Option<String>,
 
-    #[arg(long = "url")]
-    url_flag: Option<String>,
+    #[arg(long = "release-id", group = "input", value_name = "MBID")]
+    release_id: Option<String>,
 
-    #[arg(short = 'd', long = "dir", default_value = ".")]
-    dir: PathBuf,
+    #[arg(long = "release-group-id", group = "input", value_name = "MBID")]
+    release_group_id: Option<String>,
 
-    #[arg(long = "release")]
-    release: bool,
+    #[arg(short = 't', long = "target", value_enum)]
+    target: Option<TargetKind>,
 
-    #[arg(long = "release-group")]
-    release_group: bool,
-
-    #[arg(long = "all-releases")]
-    all_releases: bool,
+    #[arg(short = 'o', long = "output", value_name = "PATH")]
+    output: Option<PathBuf>,
 
     #[arg(short = 'f', long = "force")]
     force: bool,
+
+    #[arg(long = "retry", default_value_t = 0, value_name = "COUNT")]
+    retry: usize,
 }
 
-const fn resolve_target_flags(cli: &Cli, target: &TargetUrl) -> TargetFlags {
-    let any_flag = cli.release || cli.release_group || cli.all_releases;
-    if !any_flag {
-        return match target {
-            TargetUrl::Release(_) => TargetFlags {
-                release: true,
-                release_group: false,
-                all_releases: false,
-            },
-            TargetUrl::ReleaseGroup(_) => TargetFlags {
-                release: false,
-                release_group: true,
-                all_releases: false,
-            },
-        };
+fn resolve_entity(cli: &Cli) -> Result<(String, EntityType)> {
+    if let Some(url_str) = &cli.url {
+        return parse_url(url_str).context("Invalid or unsupported MusicBrainz URL");
     }
 
-    TargetFlags {
-        release: cli.release,
-        release_group: cli.release_group,
-        all_releases: cli.all_releases,
+    if let Some(rel_id) = &cli.release_id {
+        let id = extract_mbid(rel_id).context("Invalid release MBID")?;
+        return Ok((id, EntityType::Release));
     }
+
+    if let Some(rg_id) = &cli.release_group_id {
+        let id = extract_mbid(rg_id).context("Invalid release-group MBID")?;
+        return Ok((id, EntityType::ReleaseGroup));
+    }
+
+    anyhow::bail!(
+        "Missing required input: specify --url, --release-id, or --release-group-id"
+    )
+}
+
+fn resolve_target(cli: &Cli) -> Result<FetchTarget> {
+    let (mbid, entity) = resolve_entity(cli)?;
+
+    if !is_valid_uuid(&mbid) {
+        anyhow::bail!("MBID '{mbid}' is not a valid UUID");
+    }
+
+    let kind = match (entity, cli.target) {
+        (EntityType::Release, None | Some(TargetKind::Release)) => TargetKind::Release,
+        (EntityType::Release, Some(other)) => {
+            anyhow::bail!("Target '{other:?}' is invalid for a release")
+        }
+        (EntityType::ReleaseGroup, None | Some(TargetKind::ReleaseGroup)) => {
+            TargetKind::ReleaseGroup
+        }
+        (EntityType::ReleaseGroup, Some(TargetKind::AllReleases)) => {
+            TargetKind::AllReleases
+        }
+        (EntityType::ReleaseGroup, Some(TargetKind::Release)) => {
+            anyhow::bail!("Target 'release' is invalid for a release-group")
+        }
+    };
+
+    Ok(FetchTarget { mbid, kind })
 }
 
 #[tokio::main]
 async fn main() -> Result<()> {
     let cli = Cli::parse();
-    let raw_url = cli
-        .url_pos
-        .as_deref()
-        .or(cli.url_flag.as_deref())
-        .context("Missing required MusicBrainz URL argument")?;
+    let target = resolve_target(&cli)?;
 
-    let target = parse_musicbrainz_url(raw_url)
-        .context("Invalid or unsupported MusicBrainz URL")?;
+    let output_path = cli.output.map(|p| {
+        let p_str = p.to_string_lossy();
+        if p_str.starts_with('~') {
+            libactions::paths::expand_path(&p_str)
+        } else {
+            p
+        }
+    });
 
-    let flags = resolve_target_flags(&cli, &target);
-
-    let output_dir = if cli.dir.starts_with("~") {
-        libactions::paths::expand_path(&cli.dir.to_string_lossy())
-    } else {
-        cli.dir
-    };
-
-    let overwrite = if cli.force {
-        OverwriteMode::Force
-    } else {
-        OverwriteMode::Preserve
-    };
-
-    let plan = ExecutionPlan {
+    let plan = FetchPlan {
         target,
-        output_dir,
-        overwrite,
-        flags,
+        output_path,
+        overwrite: OverwriteMode::from(cli.force),
+        retry_count: cli.retry,
     };
 
     core::execute(plan).await?;
