@@ -2,6 +2,8 @@ mod discogs;
 mod fs;
 mod models;
 mod musicbrainz;
+#[cfg(test)]
+mod tests;
 
 use anyhow::Result;
 use clap::Parser;
@@ -23,9 +25,6 @@ struct Args {
 
     #[arg(long, default_value = "{albumartist} - {album}")]
     format_album: String,
-
-    #[arg(long, default_value = "Info")]
-    format_info: String,
 }
 
 #[tokio::main]
@@ -48,7 +47,6 @@ async fn main() -> Result<()> {
 
     let formatting = FormattingConfig {
         album: args.format_album,
-        info: args.format_info,
     };
 
     let root_expanded = if args.root.starts_with("~") {

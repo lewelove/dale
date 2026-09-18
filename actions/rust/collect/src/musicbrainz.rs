@@ -72,36 +72,25 @@ async fn fetch_and_fill_release(
         "https://musicbrainz.org/ws/2/release/{release_mbid}?inc=recordings+artist-credits+labels+discids+isrcs+media+release-groups+genres+tags+ratings+aliases+annotation+url-rels&fmt=json"
     );
     let release_val = fetch_json(client, &release_url).await?;
-    data.musicbrainz_release_raw = Some(release_val.clone());
-
-    let rg_mbid = release_val
-        .get("release-group")
-        .and_then(|rg| rg.get("id"))
-        .and_then(Value::as_str)
-        .map(ToString::to_string);
 
     fill_from_mb_release(&release_val, data);
 
-    if let Some(rg_id) = rg_mbid {
+    if data.date.is_empty()
+        && let Some(rg_id) = release_val
+            .get("release-group")
+            .and_then(|rg| rg.get("id"))
+            .and_then(Value::as_str)
+    {
         tokio::time::sleep(Duration::from_millis(1050)).await;
 
         let rg_url = format!(
             "https://musicbrainz.org/ws/2/release-group/{rg_id}?inc=artists+ratings+genres+tags+aliases+annotation+url-rels&fmt=json"
         );
-        if let Ok(rg_val) = fetch_json(client, &rg_url).await {
-            if data.date.is_empty()
-                && let Some(first_date) =
-                    rg_val.get("first-release-date").and_then(Value::as_str)
-            {
-                data.date = first_date.to_string();
-            }
-            data.musicbrainz_releasegroup_raw = Some(rg_val);
-        }
-
-        tokio::time::sleep(Duration::from_millis(1050)).await;
-
-        if let Ok(all_releases) = browse_all_releases(client, &rg_id).await {
-            data.musicbrainz_all_releases_raw = Some(all_releases);
+        if let Ok(rg_val) = fetch_json(client, &rg_url).await
+            && let Some(first_date) =
+                rg_val.get("first-release-date").and_then(Value::as_str)
+        {
+            data.date = first_date.to_string();
         }
     }
 
@@ -117,7 +106,6 @@ async fn fetch_and_fill_release_group(
         "https://musicbrainz.org/ws/2/release-group/{rg_mbid}?inc=artists+ratings+genres+tags+aliases+annotation+url-rels&fmt=json"
     );
     let rg_val = fetch_json(client, &rg_url).await?;
-    data.musicbrainz_releasegroup_raw = Some(rg_val.clone());
 
     data.album = rg_val
         .get("title")
@@ -147,8 +135,6 @@ async fn fetch_and_fill_release_group(
             data.date = d.to_string();
         }
     }
-
-    data.musicbrainz_all_releases_raw = Some(all_releases);
 
     Ok(())
 }

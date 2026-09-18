@@ -4,6 +4,7 @@ use libactions::fs::{escape_toml_string, sanitize_filename};
 use std::fs;
 use std::path::Path;
 
+// Creates album directory and populates canonical TOML manifests.
 pub fn create_album_directory(
     data: &AlbumData,
     formatting: &FormattingConfig,
@@ -18,34 +19,6 @@ pub fn create_album_directory(
     let album_path = root.join(dir_name);
 
     fs::create_dir_all(&album_path)?;
-
-    let info_path = album_path.join(&formatting.info);
-    fs::create_dir_all(&info_path)?;
-
-    if let Some(master) = &data.discogs_master_raw {
-        let path = info_path.join("discogs_master.json");
-        fs::write(path, serde_json::to_string_pretty(master)?)?;
-    }
-
-    if let Some(release) = &data.discogs_release_raw {
-        let path = info_path.join("discogs_release.json");
-        fs::write(path, serde_json::to_string_pretty(release)?)?;
-    }
-
-    if let Some(mb_release) = &data.musicbrainz_release_raw {
-        let path = info_path.join("musicbrainz_release.json");
-        fs::write(path, serde_json::to_string_pretty(mb_release)?)?;
-    }
-
-    if let Some(mb_rg) = &data.musicbrainz_releasegroup_raw {
-        let path = info_path.join("musicbrainz_releasegroup.json");
-        fs::write(path, serde_json::to_string_pretty(mb_rg)?)?;
-    }
-
-    if let Some(mb_all) = &data.musicbrainz_all_releases_raw {
-        let path = info_path.join("musicbrainz_all_releases.json");
-        fs::write(path, serde_json::to_string_pretty(mb_all)?)?;
-    }
 
     let meta_path = album_path.join("metadata.toml");
     write_metadata_toml(data, &meta_path)?;

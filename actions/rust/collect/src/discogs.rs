@@ -13,7 +13,6 @@ pub async fn execute_discogs(target: TargetUrl, data: &mut AlbumData) -> Result<
         }
         TargetUrl::DiscogsRelease(id) => {
             let release = fetch_discogs_release(id).await?;
-            data.discogs_release_raw = Some(serde_json::to_value(&release)?);
             if let Some(master_id) = release.master_id {
                 fetch_and_fill_discogs_master(master_id, data).await?;
             } else {
@@ -26,7 +25,6 @@ pub async fn execute_discogs(target: TargetUrl, data: &mut AlbumData) -> Result<
 
 async fn fetch_and_fill_discogs_master(id: u64, data: &mut AlbumData) -> Result<()> {
     let master = fetch_discogs_master(id).await?;
-    data.discogs_master_raw = Some(serde_json::to_value(&master)?);
     data.album = master.title;
     data.date = master.year.map_or_else(String::new, |y| y.to_string());
 
