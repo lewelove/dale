@@ -35,41 +35,87 @@ Same with TOML
 
 `/api/covers/` is a simple GET HTTP request and must comply with web standards. The signature:
 
-`/api/covers/{address}.{format}?size={positive_integer},quality={1-100},filter={filter}`
+`/api/covers/{address}.{format}?size={positive_integer}&filter={filter}&quality={1-100}`
 
-Let's define M as the `max(width, height)` of the cover requested.
+Let's define M as the `max(width, height)` of the master cover requested by address.
 
-- `format` defines the image format send over the wire: `qoi`, `png`, `avif`, `jpeg`, `webp` (lossy). Required.
+- `format` defines the image format send over the wire: `qoi`, `png`, `jpg`, `webp` (lossy). Required.
 - `size` defines the resize parameter of the largest side of the image served. Falls back to the M.
-- `quality` defines the quality of the lossy image served. For lossless formats it is ignored.
-- `filter` defines the interpolation algorithm to use for the resize. Ignored if size == M.
+- `filter` defines the interpolation algorithm to use for the resize. Defaults to `catmullrom`. Ignored if size == M.
+- `quality` defines the quality of the lossy image served. For lossless formats it is ignored. For lossy defaults to 100.
 
-All parameters are configurable in `dale.cache.cover` and act as wildcards. The requested image is saved on disk if requested params match all params in any given `dale.cache.cover`.
+## `dale.cache.cover`
 
-Files that match cache config are saved under `{cache_dir}/covers/{address}/s{size}_{filter}_q{quality}.{format}`
+This function is used to AOT populate cache with image files that will be returned by the `/api/covers/`. It will not only declare which variants must exist, but also will provide data about which endpoints are ready on disk to the interface. Interface then will instantly know: "this endpoint is already in cache, I better use its parameters".
+
+Each function call must declare a name associated with the parameters. It will be used as a key for the declaration of cached cover variants, so interface will know their purpose.
+
+The function will also have a `target` parameter. It is used to define which of master cover addresses that were *compiled* into the `album.lock.json` to target for the cache population. Defaults to `"main"`.
+
+The parametrization combination logic must follow the `/api/covers/` one. `format`, `size`, and `filter` are required. The `quality` is required if and only if `format` chosen was lossy. Examples:
+
+```lua
+-- Interface will see `"grid": {"format": "qoi", "size": 200, "filter" = "catmullrom"}` in the declaration
+dale.cache.cover("grid", {
+  format = "qoi",
+  size = 200,
+  filter = "catmullrom",
+})
+
+-- Same for the modal drawer
+dale.cache.cover("drawer", {
+  format = "jpg",
+  quality = 100,
+  size = 600,
+  filter = "catmullrom",
+})
+
+-- Example: targets only `booklet` covers
+dale.cache.cover("booklet_view", {
+  target = "booklet",
+  format = "jpg",
+  quality = 95,
+  size = 1000,
+  filter = "catmullrom",
+})
+```
+
+Resulting files are saved under `{cache_dir}/covers/{address}/s{size}_{filter}[_q{quality}].{format}`, and are used as cache hit candidates for the `/api/covers/`.
 
 ## New `compile.album.cover` Lua Function
 
 The new function will allow to have multiple image files in album root as targets for pulling into a lock file. It returns either a single table with a `path` required or a table of such tables. 
 
+It is used to specify the `master` compile target, the params are:
+
+- `path` defines the relative to album root image path. Is either a string, or a table of strings, that define the fallback priority chain. If none of targets are valid image files, throw compilation error.
+- `width` / `height` define the dimensions of bounding box in pixels.
+- `fit` defines the fit algorithm. If `crop` -> fit in box by center crop. If `inside` -> fit in box without crop.
+- `filter` defines the resize filter used.
+
+All parameters are *required* and must be valid. Else throw compilation error.
+
+Examples:
+
 ```lua
-dale.compile.album.cover("name", function()
+-- This one is default and is built in
+dale.compile.album.cover("main", function(ctx, m)
   return {
-    path = "",
-    width = 1,
-    height = 1,
-    fit = "crop" / "inside",
-    filter = ""
+    path = {
+      "cover.png",
+      "cover.jpg",
+      "cover.jpeg",
+      "folder.png",
+      "folder.jpg",
+      "folder.jpeg",
+    }
+    width = 1080,
+    height = 1080,
+    fit = "crop",
+    filter = "catmullrom",
   }
 end)
 ```
-
-It is used to specify the `master` compile target, the params are:
-
-- `path` defines the relative to album root image path
-- `width` / `height` define the dimensions of bounding box in pixels
-- `fit` defines the fit algorithm. If `crop` -> fit in box by center crop. If `inside` -> fit in box without crop.
-- `filter` defines the resize filter used
 
 Each `name` populates the `covers` object in `album.lock.json`:
 
@@ -101,6 +147,10 @@ Each `name` populates the `covers` object in `album.lock.json`:
   }
 }
 ```
+
+The `address` is a first 16 chars of a `BLAKE3(source.file.hash, width, height, fit, filter) -> URL Safe Base64`.
+
+The master cover is saved under `{cache_dir}/covers/{address}/master.qoi`
 
 ## New `tags` and `objects`
 
