@@ -1,7 +1,7 @@
 use crate::error::DaleError;
 use serde::{Deserialize, Serialize};
 use std::fs;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::time::SystemTime;
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq)]
@@ -98,27 +98,38 @@ fn check_cover_integrity(
     album_root: &Path,
     album_data: &serde_json::Value,
 ) -> TrustState {
-    if let Some(file) = album_data
+    if let Some(covers) = album_data
         .get("covers")
-        .and_then(|c| c.get("main"))
-        .and_then(|m| m.get("file"))
+        .and_then(serde_json::Value::as_object)
     {
-        let rel_path = file
-            .get("path")
-            .and_then(serde_json::Value::as_str)
-            .unwrap_or("");
-        if !rel_path.is_empty() {
-            let abs_path = album_root.join(rel_path);
-            if !abs_path.exists() {
-                return TrustState::BrokenAssets;
-            }
-            let lock_size = file
-                .get("byte_size")
-                .and_then(serde_json::Value::as_u64)
-                .unwrap_or(0);
-            let current_size = fs::metadata(&abs_path).map_or(0, |m| m.len());
-            if lock_size != current_size {
-                return TrustState::BrokenAssets;
+        for entries in covers.values().filter_map(serde_json::Value::as_array) {
+            for entry in entries {
+                let Some(file) = entry.pointer("/source/file") else {
+                    continue;
+                };
+                let path_str = file
+                    .get("path")
+                    .and_then(serde_json::Value::as_str)
+                    .unwrap_or("");
+                if path_str.is_empty() {
+                    continue;
+                }
+                let abs_path = if Path::new(path_str).is_absolute() {
+                    PathBuf::from(path_str)
+                } else {
+                    album_root.join(path_str)
+                };
+                if !abs_path.exists() {
+                    return TrustState::BrokenAssets;
+                }
+                let lock_size = file
+                    .get("byte_size")
+                    .and_then(serde_json::Value::as_u64)
+                    .unwrap_or(0);
+                let current_size = fs::metadata(&abs_path).map_or(0, |m| m.len());
+                if lock_size != current_size {
+                    return TrustState::BrokenAssets;
+                }
             }
         }
     }

@@ -17,6 +17,7 @@ blake3 = { workspace = true }
 chrono = { workspace = true }
 dirs = { workspace = true }
 dotenv-ng-core = { workspace = true }
+fast_image_resize = { workspace = true }
 image = { workspace = true }
 indexmap = { workspace = true }
 lofty = { workspace = true }

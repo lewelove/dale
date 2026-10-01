@@ -27,13 +27,26 @@ pub struct ManifestEntry {
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct CoverMain {
-    pub file: FileInfo,
+pub struct ImageInfo {
+    pub width: u32,
+    pub height: u32,
+    pub format: String,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct CoversEntry {
-    pub main: CoverMain,
+pub struct CoverSource {
+    pub file: FileInfo,
+    pub info: ImageInfo,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct CoverEntry {
+    pub address: String,
+    pub width: u32,
+    pub height: u32,
+    pub fit: String,
+    pub filter: String,
+    pub source: CoverSource,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -61,7 +74,8 @@ pub struct AlbumLock {
     pub colors: Option<serde_json::Value>,
     #[serde(default)]
     pub manifests: BTreeMap<String, ManifestEntry>,
-    pub covers: Option<CoversEntry>,
+    #[serde(default)]
+    pub covers: BTreeMap<String, Vec<CoverEntry>>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]

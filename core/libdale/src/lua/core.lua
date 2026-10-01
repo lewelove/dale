@@ -7,6 +7,7 @@ _G.REGISTRY = {
         master = { size = 1080, filter = "mitchell" },
         targets = {}
     },
+    covers_rules = {},
     keys = {
         album = {},
         tracks = {}

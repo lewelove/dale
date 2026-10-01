@@ -115,10 +115,14 @@ fn resolve_from_lock(album_dir: &Path) -> Option<PathBuf> {
     let lock_path = album_dir.join("album.lock.json");
     let content = fs::read_to_string(lock_path).ok()?;
     let val: serde_json::Value = serde_json::from_str(&content).ok()?;
-    let rel = val
-        .pointer("/album/covers/main/file/path")
+    let path_str = val
+        .pointer("/album/covers/main/0/source/file/path")
         .and_then(serde_json::Value::as_str)?;
-    let target = album_dir.join(rel);
+    let target = if Path::new(path_str).is_absolute() {
+        PathBuf::from(path_str)
+    } else {
+        album_dir.join(path_str)
+    };
     if target.is_file() { Some(target) } else { None }
 }
 

@@ -1,99 +1,343 @@
-use crate::compile::assets;
-use base64::{Engine as _, engine::general_purpose::STANDARD};
-use libdale::utils::HashMode;
+use base64::Engine as _;
+use base64::engine::general_purpose::{STANDARD, URL_SAFE_NO_PAD};
+use libdale::error::DaleError;
+use libdale::images::{
+    FitMode, calculate_rendered_dimensions, parse_filter, parse_fit_mode,
+    resize_image_fit,
+};
 use serde_json::{Value, json};
-use std::path::Path;
+use std::collections::{BTreeMap, HashSet};
+use std::fs;
+use std::path::{Path, PathBuf};
+use std::time::SystemTime;
 
-#[derive(serde::Serialize, serde::Deserialize)]
-pub struct CoverCacheEntry {
-    pub file_info: Value,
+struct CoverSpec {
+    fit_mode: FitMode,
+    fit_mode_str: String,
+    target_width: u32,
+    target_height: u32,
+    filter_type: libdale::images::FilterType,
+    filter_str: String,
+    sources: Vec<String>,
 }
 
-pub fn resolve_cover_data(
+fn parse_fit_tuple(
+    spec_obj: &serde_json::Map<String, Value>,
     album_root: &Path,
-    config: &libdale::lua::ResolvedConfig,
-) -> Value {
-    let main_cover_path = assets::resolve_cover_info(album_root);
+    namespace: &str,
+) -> Result<(FitMode, String, u32, u32), DaleError> {
+    let fit_arr = spec_obj
+        .get("fit")
+        .and_then(Value::as_array)
+        .ok_or_else(|| DaleError::InvalidCoverFit {
+            path: album_root.to_path_buf(),
+            namespace: namespace.to_string(),
+            message: "Missing or invalid 'fit' tuple, expected { mode, width, height }"
+                .to_string(),
+        })?;
 
-    let mut cover_hash_address = String::new();
-    let mut cover_file_info = Value::Null;
+    if fit_arr.len() != 3 {
+        return Err(DaleError::InvalidCoverFit {
+            path: album_root.to_path_buf(),
+            namespace: namespace.to_string(),
+            message: format!(
+                "'fit' tuple must contain exactly 3 elements, found {}",
+                fit_arr.len()
+            ),
+        });
+    }
 
-    if let Some(cp) = &main_cover_path {
-        let content = std::fs::read(cp).unwrap_or_default();
-        if !content.is_empty() {
-            cover_hash_address = libdale::utils::calculate_blake3_address(&content);
-            let raw = blake3::hash(&content);
-            let cover_hash_full = format!("blake3-{}", STANDARD.encode(raw.as_bytes()));
-            let rel_path = libdale::resolvers::rel_path(cp, album_root);
-            if let Ok(info) = libdale::utils::get_file_info(cp, &rel_path, HashMode::Skip)
-            {
-                let mut info_map = info.as_object().unwrap().clone();
-                info_map.insert("address".to_string(), json!(cover_hash_address));
-                info_map.insert("hash".to_string(), json!(cover_hash_full));
-                cover_file_info = Value::Object(info_map);
+    let fit_mode_str = fit_arr[0]
+        .as_str()
+        .ok_or_else(|| DaleError::InvalidCoverFit {
+            path: album_root.to_path_buf(),
+            namespace: namespace.to_string(),
+            message: "First element of 'fit' tuple must be a string ('crop' or 'inside')"
+                .to_string(),
+        })?
+        .to_string();
+
+    let fit_mode =
+        parse_fit_mode(&fit_mode_str).ok_or_else(|| DaleError::InvalidCoverFit {
+            path: album_root.to_path_buf(),
+            namespace: namespace.to_string(),
+            message: format!(
+                "Unknown fit mode '{fit_mode_str}', expected 'crop' or 'inside'"
+            ),
+        })?;
+
+    let target_width = fit_arr[1]
+        .as_u64()
+        .and_then(|v| u32::try_from(v).ok())
+        .filter(|&v| (1..=4096).contains(&v))
+        .ok_or_else(|| DaleError::InvalidCoverFit {
+            path: album_root.to_path_buf(),
+            namespace: namespace.to_string(),
+            message:
+                "Second element of 'fit' tuple must be an integer between 1 and 4096"
+                    .to_string(),
+        })?;
+
+    let target_height = fit_arr[2]
+        .as_u64()
+        .and_then(|v| u32::try_from(v).ok())
+        .filter(|&v| (1..=4096).contains(&v))
+        .ok_or_else(|| DaleError::InvalidCoverFit {
+            path: album_root.to_path_buf(),
+            namespace: namespace.to_string(),
+            message: "Third element of 'fit' tuple must be an integer between 1 and 4096"
+                .to_string(),
+        })?;
+
+    Ok((fit_mode, fit_mode_str, target_width, target_height))
+}
+
+fn parse_sources(
+    spec_obj: &serde_json::Map<String, Value>,
+    album_root: &Path,
+    namespace: &str,
+) -> Result<Vec<String>, DaleError> {
+    let mut sources = Vec::new();
+    let Some(src_val) = spec_obj.get("sources") else {
+        return Ok(sources);
+    };
+
+    match src_val {
+        Value::String(s) => {
+            if !s.is_empty() {
+                sources.push(s.clone());
             }
         }
+        Value::Array(arr) => {
+            for item in arr {
+                if let Some(s) = item.as_str()
+                    && !s.is_empty()
+                {
+                    sources.push(s.to_string());
+                }
+            }
+        }
+        Value::Null => {}
+        _ => {
+            return Err(DaleError::TypeMismatch {
+                path: album_root.to_path_buf(),
+                key: format!("covers.{namespace}.sources"),
+                expected_type: "string, array of strings, or nil".to_string(),
+                found_val: src_val.to_string(),
+            });
+        }
     }
 
-    assets::pregenerate_covers(config, main_cover_path.as_deref(), &cover_hash_address);
-
-    cover_file_info
+    Ok(sources)
 }
 
-pub fn resolve_cover_data_cached(
+fn parse_cover_spec(
+    namespace: &str,
+    spec_val: &Value,
     album_root: &Path,
-    config: &libdale::lua::ResolvedConfig,
-) -> Value {
-    let main_cover_path = assets::resolve_cover_info(album_root);
-    let Some(cp) = &main_cover_path else {
-        return Value::Null;
+) -> Result<CoverSpec, DaleError> {
+    let spec_obj = spec_val
+        .as_object()
+        .ok_or_else(|| DaleError::InvalidCoverFit {
+            path: album_root.to_path_buf(),
+            namespace: namespace.to_string(),
+            message: "Cover specification must be a table".to_string(),
+        })?;
+
+    let (fit_mode, fit_mode_str, target_width, target_height) =
+        parse_fit_tuple(spec_obj, album_root, namespace)?;
+
+    let filter_str = spec_obj
+        .get("filter")
+        .and_then(Value::as_str)
+        .ok_or_else(|| DaleError::InvalidCoverFilter {
+            path: album_root.to_path_buf(),
+            namespace: namespace.to_string(),
+            found: "missing".to_string(),
+        })?
+        .to_string();
+
+    let filter_type =
+        parse_filter(&filter_str).ok_or_else(|| DaleError::InvalidCoverFilter {
+            path: album_root.to_path_buf(),
+            namespace: namespace.to_string(),
+            found: filter_str.clone(),
+        })?;
+
+    let sources = parse_sources(spec_obj, album_root, namespace)?;
+
+    Ok(CoverSpec {
+        fit_mode,
+        fit_mode_str,
+        target_width,
+        target_height,
+        filter_type,
+        filter_str,
+        sources,
+    })
+}
+
+fn compute_cover_address(
+    fit_mode: &str,
+    width: u32,
+    height: u32,
+    filter: &str,
+    source_hash_bytes: &[u8],
+) -> String {
+    let mut hasher = blake3::Hasher::new();
+    hasher.update(fit_mode.as_bytes());
+    hasher.update(&[0]);
+    hasher.update(&width.to_le_bytes());
+    hasher.update(&height.to_le_bytes());
+    hasher.update(filter.as_bytes());
+    hasher.update(&[0]);
+    hasher.update(source_hash_bytes);
+    let hash_result = hasher.finalize();
+    URL_SAFE_NO_PAD.encode(hash_result.as_bytes())[..16].to_string()
+}
+
+fn resolve_source_target(
+    src_str: &str,
+    album_root: &Path,
+    album_root_canon: &Path,
+    dependencies: &mut HashSet<PathBuf>,
+) -> Option<(PathBuf, String)> {
+    let raw_path = Path::new(src_str);
+    let target = if raw_path.is_absolute() {
+        raw_path.to_path_buf()
+    } else {
+        album_root.join(raw_path)
     };
 
-    let Ok(meta) = std::fs::metadata(cp) else {
-        return Value::Null;
+    let canon = target.canonicalize().ok()?;
+    if !canon.is_file() {
+        return None;
+    }
+
+    if let Ok(rel) = canon.strip_prefix(album_root_canon) {
+        let rel_str = rel.to_string_lossy().to_string();
+        Some((canon, rel_str))
+    } else {
+        dependencies.insert(canon.clone());
+        let abs_str = canon.to_string_lossy().to_string();
+        Some((canon, abs_str))
+    }
+}
+
+pub fn process_covers(
+    album_root: &Path,
+    cache_root: &Path,
+    covers_val: Option<&Value>,
+    dependencies: &mut HashSet<PathBuf>,
+) -> Result<BTreeMap<String, Value>, DaleError> {
+    let mut result_map = BTreeMap::new();
+    let Some(covers_obj) = covers_val.and_then(Value::as_object) else {
+        return Ok(result_map);
     };
 
-    let mtime = meta
-        .modified()
-        .unwrap_or(std::time::SystemTime::UNIX_EPOCH)
-        .duration_since(std::time::SystemTime::UNIX_EPOCH)
-        .unwrap_or_default()
-        .as_nanos();
-    let size = meta.len();
-    let canon_path = cp.canonicalize().unwrap_or_else(|_| cp.clone());
+    let album_root_canon = album_root
+        .canonicalize()
+        .unwrap_or_else(|_| album_root.to_path_buf());
 
-    let cache_key_str = format!("{}:{size}:{mtime}", canon_path.display());
-    let key = blake3::hash(cache_key_str.as_bytes()).to_hex().to_string();
+    for (namespace, spec_val) in covers_obj {
+        let spec = parse_cover_spec(namespace, spec_val, album_root)?;
+        let mut entries = Vec::new();
 
-    let cache_root = libdale::utils::expand_path(&config.app.storage.cache);
-    let cache_dir = cache_root.join("covers").join("metadata");
-    let cache_file = cache_dir.join(format!("{key}.json"));
+        for src_str in &spec.sources {
+            let Some((canon_path, path_for_json)) = resolve_source_target(
+                src_str,
+                album_root,
+                &album_root_canon,
+                dependencies,
+            ) else {
+                continue;
+            };
 
-    if let Ok(content) = std::fs::read_to_string(&cache_file) {
-        if let Ok(cached) = serde_json::from_str::<CoverCacheEntry>(&content) {
-            let cover_hash_address = cached
-                .file_info
-                .get("address")
-                .and_then(Value::as_str)
-                .unwrap_or("");
-            assets::pregenerate_covers(
-                config,
-                main_cover_path.as_deref(),
-                cover_hash_address,
+            let Ok(bytes) = fs::read(&canon_path) else {
+                continue;
+            };
+
+            let raw_hash = blake3::hash(&bytes);
+            let hash_str = format!("blake3-{}", STANDARD.encode(raw_hash.as_bytes()));
+
+            let meta = fs::metadata(&canon_path).map_err(DaleError::ManifestIoError)?;
+            let mtime = meta
+                .modified()
+                .unwrap_or(SystemTime::UNIX_EPOCH)
+                .duration_since(SystemTime::UNIX_EPOCH)
+                .unwrap_or_default()
+                .as_secs();
+            let byte_size = meta.len();
+
+            let Ok(img) = image::load_from_memory(&bytes) else {
+                continue;
+            };
+
+            let src_w = img.width();
+            let src_h = img.height();
+            let format_str = image::guess_format(&bytes).map_or_else(
+                |_| "unknown".to_string(),
+                |f| format!("{f:?}").to_lowercase(),
             );
-            return cached.file_info;
+
+            let address = compute_cover_address(
+                &spec.fit_mode_str,
+                spec.target_width,
+                spec.target_height,
+                &spec.filter_str,
+                raw_hash.as_bytes(),
+            );
+
+            let (rendered_w, rendered_h) = calculate_rendered_dimensions(
+                src_w,
+                src_h,
+                spec.target_width,
+                spec.target_height,
+                spec.fit_mode,
+            );
+
+            let master_dir = cache_root.join("covers").join(&address);
+            let master_qoi_path = master_dir.join("master.qoi");
+
+            if !master_qoi_path.exists() {
+                let img_rgb = img.into_rgb8();
+                if let Some(resized) = resize_image_fit(
+                    &img_rgb,
+                    spec.target_width,
+                    spec.target_height,
+                    spec.fit_mode,
+                    spec.filter_type,
+                ) {
+                    let _ = fs::create_dir_all(&master_dir);
+                    let _ = resized
+                        .save_with_format(&master_qoi_path, image::ImageFormat::Qoi);
+                }
+            }
+
+            entries.push(json!({
+                "address": address,
+                "width": rendered_w,
+                "height": rendered_h,
+                "fit": spec.fit_mode_str,
+                "filter": spec.filter_str,
+                "source": {
+                    "file": {
+                        "path": path_for_json,
+                        "hash": hash_str,
+                        "mtime": mtime,
+                        "byte_size": byte_size
+                    },
+                    "info": {
+                        "width": src_w,
+                        "height": src_h,
+                        "format": format_str
+                    }
+                }
+            }));
         }
-        let _ = std::fs::remove_file(&cache_file);
+
+        result_map.insert(namespace.clone(), Value::Array(entries));
     }
 
-    let file_info = resolve_cover_data(album_root, config);
-
-    let entry = CoverCacheEntry {
-        file_info: file_info.clone(),
-    };
-    if let Ok(json_str) = serde_json::to_string(&entry) {
-        let _ = libdale::utils::write_atomic_cache_file(&cache_file, &json_str);
-    }
-
-    file_info
+    Ok(result_map)
 }

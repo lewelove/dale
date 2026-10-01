@@ -6,11 +6,22 @@ pub use sort::{SortKey, SortOrder, value_to_sort_key};
 
 use anyhow::Result;
 use libdale::error::DaleError;
+use libdale::images::{FilterType, FitMode, parse_filter, parse_fit_mode};
 use libdale::lua::{LogicManifest, with_evaluated_lua_vm};
 use roaring::RoaringBitmap;
 use serde_json::{Value, json};
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
+
+#[derive(Clone, Debug)]
+pub struct CoverLookupItem {
+    pub album_dir: PathBuf,
+    pub path: String,
+    pub fit_mode: FitMode,
+    pub target_width: u32,
+    pub target_height: u32,
+    pub filter: FilterType,
+}
 
 pub struct LogicEngine {
     pub config_path: PathBuf,
@@ -27,7 +38,7 @@ pub struct LogicEngine {
     pub(crate) next_uid: u32,
     pub albums_by_path: HashMap<PathBuf, String>,
     pub path_by_id: HashMap<String, PathBuf>,
-    pub cover_lookup: HashMap<String, HashMap<PathBuf, String>>,
+    pub cover_lookup: HashMap<String, CoverLookupItem>,
     pub dict: HashMap<String, Value>,
     pub track_lookup: HashMap<String, Value>,
     pub path_lookup: HashMap<String, String>,
@@ -120,24 +131,9 @@ impl LogicEngine {
         }
         if let Some(path) = self.path_by_id.remove(id) {
             self.albums_by_path.remove(&path);
-            if let Some(dict_entry) = self.dict.remove(id)
-                && let Some(hash) = dict_entry.get("cover_hash").and_then(Value::as_str)
-                && let Some(entries) = self.cover_lookup.get_mut(hash)
-            {
-                entries.remove(&path);
-                if entries.is_empty() {
-                    self.cover_lookup.remove(hash);
-                }
-            }
-        } else if let Some(dict_entry) = self.dict.remove(id)
-            && let Some(hash) = dict_entry.get("cover_hash").and_then(Value::as_str)
-            && let Some(entries) = self.cover_lookup.get_mut(hash)
-        {
-            entries.retain(|_, v| v != id);
-            if entries.is_empty() {
-                self.cover_lookup.remove(hash);
-            }
+            self.cover_lookup.retain(|_, item| item.album_dir != path);
         }
+        self.dict.remove(id);
         self.lock_cache.remove(id);
         self.path_lookup.retain(|_, v| v != id);
         self.track_lookup
@@ -240,6 +236,73 @@ impl LogicEngine {
         }
     }
 
+    fn ingest_covers(
+        &mut self,
+        album: &Value,
+        album_dir_canon: &Path,
+    ) -> (Option<Value>, Option<Value>) {
+        let main_cover = album
+            .get("covers")
+            .and_then(|c| c.get("main"))
+            .and_then(Value::as_array)
+            .and_then(|arr| arr.first());
+
+        let cover_path_val = main_cover
+            .and_then(|m| m.pointer("/source/file/path"))
+            .cloned();
+        let cover_hash_val = main_cover.and_then(|m| m.get("address")).cloned();
+
+        let Some(covers) = album.get("covers").and_then(Value::as_object) else {
+            return (cover_path_val, cover_hash_val);
+        };
+
+        for entries in covers.values().filter_map(Value::as_array) {
+            for entry in entries {
+                let Some(addr) = entry.get("address").and_then(Value::as_str) else {
+                    continue;
+                };
+                let Some(p_str) =
+                    entry.pointer("/source/file/path").and_then(Value::as_str)
+                else {
+                    continue;
+                };
+                let fit_str =
+                    entry.get("fit").and_then(Value::as_str).unwrap_or("inside");
+                let filter_str = entry
+                    .get("filter")
+                    .and_then(Value::as_str)
+                    .unwrap_or("catmullrom");
+                let width = entry
+                    .get("width")
+                    .and_then(Value::as_u64)
+                    .and_then(|v| u32::try_from(v).ok())
+                    .unwrap_or(1080);
+                let height = entry
+                    .get("height")
+                    .and_then(Value::as_u64)
+                    .and_then(|v| u32::try_from(v).ok())
+                    .unwrap_or(1080);
+
+                let fit_mode = parse_fit_mode(fit_str).unwrap_or(FitMode::Inside);
+                let filter = parse_filter(filter_str).unwrap_or(FilterType::CatmullRom);
+
+                self.cover_lookup.insert(
+                    addr.to_string(),
+                    CoverLookupItem {
+                        album_dir: album_dir_canon.to_path_buf(),
+                        path: p_str.to_string(),
+                        fit_mode,
+                        target_width: width,
+                        target_height: height,
+                        filter,
+                    },
+                );
+            }
+        }
+
+        (cover_path_val, cover_hash_val)
+    }
+
     pub fn ingest_pre_evaluated(
         &mut self,
         album_dir: &Path,
@@ -292,26 +355,8 @@ impl LogicEngine {
                 );
             }
 
-            let cover_path_val = album
-                .get("covers")
-                .and_then(|c| c.get("main"))
-                .and_then(|m| m.get("file"))
-                .and_then(|f| f.get("path"));
-            let cover_hash_val = album
-                .get("covers")
-                .and_then(|c| c.get("main"))
-                .and_then(|m| m.get("file"))
-                .and_then(|f| f.get("address"));
-
-            if let (Some(ch), Some(cp)) = (
-                cover_hash_val.and_then(Value::as_str),
-                cover_path_val.and_then(Value::as_str),
-            ) {
-                self.cover_lookup
-                    .entry(ch.to_string())
-                    .or_default()
-                    .insert(album_dir_canon, cp.to_string());
-            }
+            let (cover_path_val, cover_hash_val) =
+                self.ingest_covers(album, &album_dir_canon);
 
             let entry = json!({
                 "id": id,
@@ -320,6 +365,7 @@ impl LogicEngine {
                 "date": album.get("date"),
                 "cover_path": cover_path_val,
                 "cover_hash": cover_hash_val,
+                "covers": album.get("covers"),
                 "duration_formatted": info.get("duration_formatted"),
                 "total_discs": info.get("total_discs"),
                 "total_tracks": info.get("total_tracks"),

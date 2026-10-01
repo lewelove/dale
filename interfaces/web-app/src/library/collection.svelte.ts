@@ -3,6 +3,22 @@ import { sync } from "./sync.svelte.ts";
 import { updatePlayerState } from "../modules/player.svelte.ts";
 import { config as globalConfig, updateConfig } from "../config.svelte.ts";
 
+function triggerCoverPrewarm() {
+  const sizes = [200, 619];
+  for (const size of sizes) {
+    fetch("/api/internal/cache_covers", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        names: ["main"],
+        format: "bmp",
+        size,
+        filter: "catmullrom"
+      })
+    }).catch(() => {});
+  }
+}
+
 class CollectionStore {
   activeInterface: string = $state("default");
   dict: Record<string, any> = $state({});
@@ -32,6 +48,7 @@ class CollectionStore {
       this.trackPathMap = json.trackMap || {};
       if (json.manifest) this.manifest = json.manifest;
       if (json.config) this.config = { ...this.config, ...json.config };
+      triggerCoverPrewarm();
     } else if (json.type === "VIEW_DATA") {
       this.libraryViewIds = json.ids || [];
     } else if (json.type === "GROUP_RESULT") {
@@ -42,6 +59,7 @@ class CollectionStore {
       if (json.shelves) this.sidebarShelves = json.shelves;
       delete this.dict[json.id];
       delete this.fullAlbumCache[json.id];
+      triggerCoverPrewarm();
     } else if (json.type === "ALBUM_UPDATED") {
       if (json.shelves) this.sidebarShelves = json.shelves;
       if (json.old_id && json.old_id !== json.id) {
@@ -54,6 +72,7 @@ class CollectionStore {
         delete this.dict[json.id];
       }
       delete this.fullAlbumCache[json.id];
+      triggerCoverPrewarm();
     } else if (json.type === "ALBUMS_UPDATED") {
       if (json.shelves) this.sidebarShelves = json.shelves;
       if (json.removed) {
@@ -74,6 +93,7 @@ class CollectionStore {
           delete this.fullAlbumCache[id];
         }
       }
+      triggerCoverPrewarm();
     } else if (json.type === "LOGIC_UPDATE") {
       if (json.manifest) this.manifest = json.manifest;
     } else if (json.type === "CONFIG_UPDATE") {
@@ -101,6 +121,7 @@ class CollectionStore {
               title: a.album,
               artist: a.albumartist,
               cover_hash: a.cover_hash,
+              covers: a.covers,
               total_discs: a.total_discs,
               total_tracks: a.total_tracks,
               duration_formatted: a.duration_formatted,
@@ -117,7 +138,7 @@ class CollectionStore {
     if (!album || !album.cover_hash) return "";
     const algo = globalConfig.album_grid.album_card.cover.filter || "lanczos";
     const size = globalConfig.album_grid.album_card.cover.size || 200;
-    return `/api/covers/${algo}/${size}px/${album.cover_hash}`;
+    return `/api/covers/${album.cover_hash}.bmp?size=${size}&filter=${algo}`;
   }
 
   async ensureFullAlbum(id: string): Promise<any> {

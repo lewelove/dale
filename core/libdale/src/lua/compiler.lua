@@ -15,6 +15,11 @@ _G.dale.compile.album = {
         if type(v) == "function" then
             REGISTRY.id_fn = v
         end
+    end,
+    cover = function(name, v)
+        if type(v) == "function" then
+            REGISTRY.covers_rules[name] = v
+        end
     end
 }
 
@@ -44,8 +49,34 @@ _G.dale.compile.a = _G.dale.compile.album
 _G.dale.compile.track = _G.dale.compile.tracks
 _G.dale.compile.t = _G.dale.compile.tracks
 
+_G.dale.compile.album.cover("main", function(ctx, m)
+    local root = ctx.paths.album_root
+    local candidates = {
+        "cover.png",
+        "cover.jpg",
+        "cover.jpeg",
+        "folder.png",
+        "folder.jpg",
+        "folder.jpeg",
+    }
+    local matched = nil
+
+    for _, name in ipairs(candidates) do
+        if d.fs.exists(d.fs.joinpath(root, name)) then
+            matched = name
+            break
+        end
+    end
+
+    return {
+        fit = { "crop", 1080, 1080 },
+        filter = "catmullrom",
+        sources = matched
+    }
+end)
+
 function __DALE_DISPATCHER(ctx, manifests)
-    local results = { id = nil, album = {}, tracks = {} }
+    local results = { id = nil, album = {}, tracks = {}, covers = {} }
 
     local meta_album = manifests.metadata and manifests.metadata.album or {}
     if type(REGISTRY.id_fn) == "function" then
@@ -72,6 +103,16 @@ function __DALE_DISPATCHER(ctx, manifests)
         end
         if res ~= nil and res ~= "" then
             results.album[key_name] = res
+        end
+    end
+
+    for name, func in pairs(REGISTRY.covers_rules) do
+        local status, res = pcall(func, ctx, manifests)
+        if not status then
+            error(string.format("Error evaluating album cover '%s': %s", name, res))
+        end
+        if res ~= nil then
+            results.covers[name] = res
         end
     end
     

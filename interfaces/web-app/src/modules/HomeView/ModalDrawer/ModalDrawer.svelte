@@ -14,7 +14,7 @@ let leftColumnWidth = $derived(Math.round(0.36 * windowWidth));
 let albumData = $derived(album.album || {});
 let infoData = $derived(albumData.info || {});
 
-let coverHash = $derived(albumData.covers?.main?.file?.address || "");
+let coverHash = $derived(albumData.covers?.main?.[0]?.address || "");
 let title = $derived(albumData.album || "Untitled");
 let artist = $derived(albumData.albumartist || "Unknown");
 let dateString = $derived(albumData.date || "");
@@ -33,7 +33,7 @@ $effect(() => {
 
   const dpr = window.devicePixelRatio || 1;
   const targetWidth = Math.round((leftColumnWidth - 64) * dpr);
-  const srcUrl = `/api/covers/catmullrom/${targetWidth}px/${coverHash}?v=${coverHash}`;
+  const srcUrl = `/api/covers/${coverHash}.bmp?size=${targetWidth}&filter=catmullrom`;
 
   const img = new Image();
   img.src = srcUrl;

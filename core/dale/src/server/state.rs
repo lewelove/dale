@@ -7,6 +7,39 @@ use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex, atomic::AtomicBool};
 use tokio::sync::{RwLock, broadcast};
 
+#[derive(Default)]
+pub struct CoverTaskRegistry {
+    tasks: Mutex<HashSet<PathBuf>>,
+}
+
+pub struct CoverTaskGuard {
+    path: PathBuf,
+    registry: Arc<CoverTaskRegistry>,
+}
+
+impl CoverTaskRegistry {
+    #[must_use]
+    pub fn try_claim(self: &Arc<Self>, path: PathBuf) -> Option<CoverTaskGuard> {
+        let mut set = self.tasks.lock().unwrap();
+        if set.insert(path.clone()) {
+            Some(CoverTaskGuard {
+                path,
+                registry: Arc::clone(self),
+            })
+        } else {
+            None
+        }
+    }
+}
+
+impl Drop for CoverTaskGuard {
+    fn drop(&mut self) {
+        if let Ok(mut set) = self.registry.tasks.lock() {
+            set.remove(&self.path);
+        }
+    }
+}
+
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct DependencyGraph {
     pub file_to_albums: HashMap<PathBuf, HashSet<PathBuf>>,
@@ -121,6 +154,7 @@ pub struct AppState {
     pub tracked_albums: Arc<Mutex<HashSet<String>>>,
     pub full_rescan_needed: Arc<AtomicBool>,
     pub active_writes: Arc<Mutex<HashSet<PathBuf>>>,
+    pub cover_tasks: Arc<CoverTaskRegistry>,
     pub update_lock: Arc<Mutex<UpdateState>>,
     pub deps_graph: Arc<RwLock<DependencyGraph>>,
 }

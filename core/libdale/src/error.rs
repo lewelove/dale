@@ -113,4 +113,20 @@ pub enum DaleError {
         path_a: PathBuf,
         path_b: PathBuf,
     },
+
+    #[error("Invalid Cover Fit in {path} for '{namespace}': {message}")]
+    InvalidCoverFit {
+        path: PathBuf,
+        namespace: String,
+        message: String,
+    },
+
+    #[error(
+        "Invalid Cover Filter in {path} for '{namespace}': '{found}' is not a valid filter"
+    )]
+    InvalidCoverFilter {
+        path: PathBuf,
+        namespace: String,
+        found: String,
+    },
 }
