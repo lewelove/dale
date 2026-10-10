@@ -91,7 +91,7 @@ let {
   padding: 0 12px;
   font-size: 12px;
   font-weight: 400;
-  border: 2px solid var(--border-muted);
+  border: 1px solid var(--border-muted);
   border-radius: 8px;
   height: 24px;
   box-sizing: border-box;

@@ -3,7 +3,6 @@ import { player } from "../player.svelte.ts";
 import { collection } from "../../library/collection.svelte.ts";
 import { view } from "../../library/view.svelte.ts";
 import { nav } from "../../navigation.svelte.ts";
-import { deriveColorTokens } from "../../colors.svelte.ts";
 
 import BackgroundShader from "./BackgroundShader.svelte";
 import NavigationBar from "../NavigationBar.svelte";
@@ -28,13 +27,11 @@ let foregroundColor = $derived(
 let isShaderOn = $derived(view.isShaderActive && hasPalette);
 let activeForeground = $derived(isShaderOn && foregroundColor ? foregroundColor : null);
 
-let queueContainerStyle = $derived.by(() => {
-  if (!activeForeground) return "";
-  const tokens = deriveColorTokens(activeForeground);
-  return Object.entries(tokens)
-    .map(([k, v]) => `${k}: ${v};`)
-    .join(" ");
-});
+let queueContainerStyle = $derived(
+  activeForeground
+    ? `--text-main: ${activeForeground}; --text-muted: ${activeForeground}; --text-subtle: ${activeForeground};`
+    : ""
+);
 
 let isViewVisible = $derived(nav.activeTab === "queue");
 let isPlaying = $derived(player.state === "play");

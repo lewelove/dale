@@ -3,7 +3,7 @@ import { onMount, onDestroy } from "svelte";
 import { SvelteSet, SvelteMap } from "svelte/reactivity";
 import { GridController } from "./GridController.svelte.ts";
 import { config } from "../../../config.svelte.ts";
-import { colorsState } from "../../../colors.svelte.ts";
+import { canvasColors } from "../../../colors.svelte.ts";
 import { collection } from "../../../library/collection.svelte.ts";
 import { prewarmer } from "../../../library/prewarmer.svelte.ts";
 
@@ -76,12 +76,12 @@ function getTextCanvas(album: any, coverSize: number, textBlockHeight: number, t
 
   cCtx.scale(dpr, dpr);
 
-  cCtx.fillStyle = colorsState.palette.ok200;
+  cCtx.fillStyle = canvasColors.bg;
   cCtx.fillRect(0, 0, coverSize, textBlockHeight);
 
   const fontStack = "'Inter Dale', 'Noto Sans', system-ui, sans-serif";
 
-  cCtx.fillStyle = colorsState.palette.ok100;
+  cCtx.fillStyle = canvasColors.title;
   cCtx.globalAlpha = 1.0;
   const sTitle = textConfig.title.size;
   const lhTitle = Math.round(sTitle * 1.2);
@@ -90,7 +90,7 @@ function getTextCanvas(album: any, coverSize: number, textBlockHeight: number, t
   const titleText = fitText(cCtx, album.title, coverSize);
   cCtx.fillText(titleText, 0, lhTitle / 2);
 
-  cCtx.globalAlpha = 0.7;
+  cCtx.fillStyle = canvasColors.artist;
   const sArtist = textConfig.albumartist.size;
   const gapLesser = textConfig.spacing.middle;
   const lhArtist = Math.round(sArtist * 1.2);
@@ -118,15 +118,15 @@ function getEmptyCoverCanvas(size: number) {
 
   cCtx.scale(dpr, dpr);
 
-  cCtx.fillStyle = colorsState.palette.ok200;
+  cCtx.fillStyle = canvasColors.bg;
 
-  cCtx.shadowColor = "oklch(0 0 0 / 0.3)";
+  cCtx.shadowColor = canvasColors.shadowOuter;
   cCtx.shadowBlur = 12;
   cCtx.shadowOffsetX = 0;
   cCtx.shadowOffsetY = 0;
   cCtx.fillRect(pad, pad, size, size);
 
-  cCtx.shadowColor = "oklch(0 0 0 / 0.1)";
+  cCtx.shadowColor = canvasColors.shadowInner;
   cCtx.shadowBlur = 8;
   cCtx.fillRect(pad, pad, size, size);
 
@@ -165,7 +165,7 @@ function renderCanvas() {
   ctx.save();
   ctx.scale(dpr, dpr);
 
-  ctx.fillStyle = colorsState.palette.ok200;
+  ctx.fillStyle = canvasColors.bg;
   ctx.fillRect(0, 0, w, h);
 
   const coverSize = ctrl.layout.cardSize;
@@ -387,7 +387,9 @@ $effect(() => {
 
 $effect(() => {
   const _c = config.album_grid;
-  const _col = $state.snapshot(colorsState.palette);
+  const _bg = canvasColors.bg;
+  const _title = canvasColors.title;
+  const _artist = canvasColors.artist;
   textCache.clear();
   emptyCoverCanvas = null;
 });

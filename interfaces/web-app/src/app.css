@@ -12,26 +12,26 @@
 }
 
 :root {
-  --color-ok100: oklch(1 0 0);
-  --color-ok200: oklch(0.31 0 0);
-  --color-ok300: oklch(0.24 0 0);
-  --color-ok400: oklch(0.20 0 0);
-  --color-ok500: oklch(0.14 0 0);
+  --bg-main: oklch(0.24 0 0);
+  --bg-queue: oklch(0.29 0 0);
+  --bg-panel: oklch(0.24 0 0);
+  --bg-menu: oklch(0.29 0 0);
+  --bg-album-grid: oklch(0.29 0 0);
 
-  --color-foreground: var(--color-ok100);
-  --color-background: var(--color-ok300);
+  --bg-modal-backdrop: oklch(0 0 0 / 0.6);
+  --bg-modal-left: oklch(0.20 0 0);
+  --bg-modal-right: oklch(0.24 0 0);
 
   --text-main: oklch(1 0 0 / 1);
   --text-muted: oklch(1 0 0 / 0.66);
   --text-subtle: oklch(1 0 0 / 0.50);
 
   --border-muted: oklch(1 0 0 / 0.08);
-  --border-subtle: oklch(1 0 0 / 0.02);
 
   --bg-surface-hover: oklch(1 0 0 / 0.05);
   --bg-surface-active: oklch(1 0 0 / 0.08);
 
-  --bg-item-inactive: oklch(1 0 0 / 0);
+  --bg-item-inactive: transparent;
   --bg-item-hover: oklch(1 0 0 / 0.08);
   --bg-item-active: oklch(1 0 0 / 0.08);
 
@@ -39,15 +39,11 @@
   --bg-button-hover: oklch(1 0 0 / 0.16);
   --bg-button-active: oklch(1 0 0 / 0.16);
 
-  --bg-main: var(--color-ok300);
-  --bg-queue: var(--color-ok200);
-  --bg-panel: var(--color-ok300);
-  --bg-menu: var(--color-ok200);
-  --bg-album-grid: var(--color-ok200);
-
-  --bg-modal-backdrop: oklch(0 0 0 / 0.6);
-  --bg-modal-left: var(--color-ok400);
-  --bg-modal-right: var(--color-ok300);
+  --canvas-bg: oklch(0.29 0 0);
+  --canvas-text-title: oklch(1 0 0);
+  --canvas-text-artist: oklch(1 0 0 / 0.7);
+  --canvas-shadow-outer: oklch(0 0 0 / 0.3);
+  --canvas-shadow-inner: oklch(0 0 0 / 0.1);
 
   --album-cover-shadow-thumbnail:
     0px 0px 10px 0px oklch(0 0 0 / 0.4), 0px 0px 8px 0px oklch(0 0 0 / 0.7);

@@ -15,14 +15,14 @@
         }
       },
       "cover": {
-        "size": 200,
+        "size": 220,
         "filter": "catmullrom"
       }
     },
     "spacing": {
-      "top": 20,
-      "x": 20,
-      "y": 16
+      "top": 24,
+      "x": 16,
+      "y": 20
     }
   },
   "shader": {
@@ -32,12 +32,5 @@
     "blur": 0.8,
     "grain": 1.7,
     "order": "original"
-  },
-  "palette": {
-    "ok200": "oklch(0.29 0 0)",
-    "ok300": "oklch(0.24 0 0)",
-    "ok400": "oklch(0.21 0 0)",
-    "ok500": "oklch(0.07 0 0)",
-    "ok100": "oklch(1.00 0 0)"
   }
 }

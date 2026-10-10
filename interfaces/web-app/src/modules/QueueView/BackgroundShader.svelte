@@ -1,7 +1,6 @@
 <script>
 import { onMount, onDestroy } from "svelte";
 import { config } from "../../config.svelte.ts";
-import { colorsState } from "../../colors.svelte.ts";
 import { view } from "../../library/view.svelte.ts";
 
 import vertexShaderSource from "./Shaders/Quad.vert?raw";
@@ -39,45 +38,46 @@ let activeColorCount = 0;
 let shaderSource = $derived(
   SHADERS[config.shader?.name] || mountainEqShader
 );
-let probeEl = null;
 
-function getProbeElement() {
-  if (!probeEl && typeof document !== "undefined") {
-    probeEl = document.createElement("span");
-    probeEl.style.display = "none";
-    document.head.appendChild(probeEl);
+function parseHexToRgb(hex) {
+  let clean = hex.replace("#", "").trim();
+  if (clean.length === 3) {
+    clean = clean.split("").map((c) => c + c).join("");
   }
-  return probeEl;
+  const num = parseInt(clean, 16);
+  if (isNaN(num)) return [0.2, 0.2, 0.2];
+  return [(num >> 16) & 255, (num >> 8) & 255, num & 255].map((v) => v / 255);
+}
+
+function srgbToLinear(c) {
+  return c <= 0.04045 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4);
 }
 
 function parseColorToOklab(colorStr) {
   if (!colorStr) return [0.26, 0, 0];
-  const el = getProbeElement();
-  if (!el) return [0.26, 0, 0];
-  el.style.color = "";
-  el.style.color = `oklab(from ${colorStr} l a b)`;
-  const match = getComputedStyle(el).color.match(/-?[\d.]+(?:e-?\d+)?/gi);
-  if (match && match.length >= 3) {
-    return [parseFloat(match[0]), parseFloat(match[1]), parseFloat(match[2])];
-  }
-  return [0.26, 0, 0];
+  if (Array.isArray(colorStr)) return [colorStr[0] || 0.26, colorStr[1] || 0, colorStr[2] || 0];
+  const rgb = parseHexToRgb(colorStr);
+  const r = srgbToLinear(rgb[0]);
+  const g = srgbToLinear(rgb[1]);
+  const b = srgbToLinear(rgb[2]);
+
+  const l_ = Math.cbrt(0.4122214708 * r + 0.5363325363 * g + 0.0514459929 * b);
+  const m_ = Math.cbrt(0.2119034982 * r + 0.6806995451 * g + 0.1073969566 * b);
+  const s_ = Math.cbrt(0.0883024619 * r + 0.2817188376 * g + 0.6299787005 * b);
+
+  const L = 0.2104542553 * l_ + 0.7936177850 * m_ - 0.0040720468 * s_;
+  const a = 1.9779984951 * l_ - 2.4285922050 * m_ + 0.4505937099 * s_;
+  const bVal = 0.0259040371 * l_ + 0.7827717662 * m_ - 0.8086757660 * s_;
+
+  return [L, a, bVal];
 }
 
 function parseColorToOklch(colorStr) {
-  if (!colorStr) return { L: 0.26, C: 0, H: 0 };
-  const el = getProbeElement();
-  if (!el) return { L: 0.26, C: 0, H: 0 };
-  el.style.color = "";
-  el.style.color = `oklch(from ${colorStr} l c h)`;
-  const match = getComputedStyle(el).color.match(/-?[\d.]+(?:e-?\d+)?/gi);
-  if (match && match.length >= 3) {
-    return {
-      L: parseFloat(match[0]),
-      C: parseFloat(match[1]),
-      H: parseFloat(match[2])
-    };
-  }
-  return { L: 0.26, C: 0, H: 0 };
+  const [L, a, b] = parseColorToOklab(colorStr);
+  const C = Math.hypot(a, b);
+  let H = (Math.atan2(b, a) * 180) / Math.PI;
+  if (H < 0) H += 360;
+  return { L, C, H };
 }
 
 function getChroma(c) {
@@ -94,7 +94,7 @@ function shuffle(array) {
 }
 
 $effect(() => {
-  let palette = colors && colors.length > 0 ? [...colors] : [colorsState.palette.ok300];
+  let palette = colors && colors.length > 0 ? [...colors] : ["#3d3d3d"];
   const order = config.shader?.order || "original";
 
   if (order !== "original") {
@@ -332,10 +332,6 @@ onDestroy(() => {
   if (animationFrame) cancelAnimationFrame(animationFrame);
   window.removeEventListener("resize", handleResize);
   document.removeEventListener("visibilitychange", handleVisibilityChange);
-  if (probeEl) {
-    probeEl.remove();
-    probeEl = null;
-  }
 });
 </script>
 

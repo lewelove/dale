@@ -1,42 +1,9 @@
-import { applyColors } from "./colors.svelte.ts";
+import appConfig from "../config.json";
 
-export const config = $state({
-  shader: {
-    order: "original",
-    speed: 1.7,
-    zoom: 0.3,
-    blur: 0.8,
-    grain: 0.1,
-    equalize: 1.0
-  },
-  palette: {
-    ok100: "oklch(1.00 0 0)",
-    ok200: "oklch(0.32 0 0)",
-    ok300: "oklch(0.26 0 0)",
-    ok400: "oklch(0.20 0 0)",
-    ok500: "oklch(0.14 0 0)"
-  },
-  album_grid: {
-    spacing: { x: 20, y: 16, top: 20 },
-    album_card: {
-      cover: { size: 200, filter: "lanczos" },
-      text: {
-        enable: true,
-        title: { size: 14 },
-        albumartist: { size: 12 },
-        spacing: { top: 11, middle: 2 }
-      }
-    }
-  }
-});
+export const config = $state(structuredClone(appConfig));
 
 export function updateConfig(newData: any) {
   if (!newData) return;
-
-  if (newData.palette) {
-    Object.assign(config.palette, newData.palette);
-    applyColors(newData);
-  }
 
   if (newData.shader) {
     Object.assign(config.shader, newData.shader);
@@ -77,4 +44,12 @@ export function updateConfig(newData: any) {
       }
     }
   }
+}
+
+if (import.meta.hot) {
+  import.meta.hot.accept("../config.json", (mod: any) => {
+    if (mod) {
+      updateConfig(mod.default ?? mod);
+    }
+  });
 }
