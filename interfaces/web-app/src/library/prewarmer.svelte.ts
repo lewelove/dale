@@ -19,8 +19,7 @@ class Prewarmer {
         json.type === "ALBUMS_UPDATED" ||
         json.type === "INIT_DICT" ||
         json.type === "LOGIC_UPDATE" ||
-        json.type === "CONFIG_UPDATE" ||
-        json.type === "INTERFACE_CONFIG_UPDATE"
+        json.type === "CONFIG_UPDATE"
       ) {
         this.pruneTextures();
         this.orchestrate();

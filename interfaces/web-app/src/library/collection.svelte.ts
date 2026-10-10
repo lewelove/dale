@@ -20,7 +20,6 @@ function triggerCoverPrewarm() {
 }
 
 class CollectionStore {
-  activeInterface: string = $state("default");
   dict: Record<string, any> = $state({});
   trackPathMap: Record<string, any> = $state({});
   sidebarShelves: Record<string, string[]> = $state({});
@@ -98,11 +97,6 @@ class CollectionStore {
       if (json.manifest) this.manifest = json.manifest;
     } else if (json.type === "CONFIG_UPDATE") {
       if (json.config) {
-        this.config = { ...this.config, ...json.config };
-        updateConfig(json.config);
-      }
-    } else if (json.type === "INTERFACE_CONFIG_UPDATE") {
-      if (json.config && json.name === this.activeInterface) {
         this.config = { ...this.config, ...json.config };
         updateConfig(json.config);
       }

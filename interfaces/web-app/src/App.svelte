@@ -155,10 +155,6 @@ onMount(() => {
 });
 </script>
 
-<svelte:head>
-  <link rel="stylesheet" href="/api/interfaces/default/assets/dale.css?v={view.assetVersion}" />
-</svelte:head>
-
 <main tabindex="-1">
   <div
     class="view-layer home"

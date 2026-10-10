@@ -29,7 +29,6 @@ export class ViewState {
   shelfVersion: number = $state(0);
   shelfResetVersion: number = $state(0);
   isShaderEnabled: boolean = $state(true);
-  assetVersion: number = $state(Date.now());
   sidebarWidth: number = $state(280);
   isFocusInstant: boolean = $state(false);
   _pendingViewReset: boolean = false;
@@ -129,12 +128,7 @@ export class ViewState {
       }
       this.isLoading = false;
       this._pendingViewReset = false;
-    } else if (
-      json.type === "INTERFACE_ASSET_UPDATE" ||
-      json.type === "INTERFACE_CONFIG_UPDATE" ||
-      json.type === "CONFIG_UPDATE"
-    ) {
-      this.assetVersion = Date.now();
+    } else if (json.type === "CONFIG_UPDATE") {
       this.refreshView(false);
       this.refreshSidebar();
     } else if (json.type === "LOGIC_UPDATE") {

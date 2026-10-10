@@ -5,11 +5,21 @@ import { colorsState } from "../../colors.svelte.ts";
 import { view } from "../../library/view.svelte.ts";
 
 import vertexShaderSource from "./Shaders/Quad.vert?raw";
-import internalFragmentShader from "./Shaders/Simplex.frag?raw";
+import mountainEqShader from "../../../shaders/mountain_eq.frag?raw";
+import mountainShader from "../../../shaders/mountain.frag?raw";
+import simplexLegacyShader from "../../../shaders/simplex_legacy.frag?raw";
+import simplexShader from "../../../shaders/simplex.frag?raw";
 
 let { colors = [], coverSize = 0, visible = false, isPlaying = false } = $props();
 
 const PALETTE_SIZE_LIMIT = 12;
+
+const SHADERS = {
+  mountain_eq: mountainEqShader,
+  mountain: mountainShader,
+  simplex_legacy: simplexLegacyShader,
+  simplex: simplexShader
+};
 
 let canvasEl;
 let gl;
@@ -26,7 +36,9 @@ const floatColorsOklab = new Float32Array(24 * 3);
 const floatRatios = new Float32Array(24);
 let activeColorCount = 0;
 
-let shaderSource = $state(internalFragmentShader);
+let shaderSource = $derived(
+  SHADERS[config.shader?.name] || mountainEqShader
+);
 let probeEl = null;
 
 function getProbeElement() {
@@ -80,24 +92,6 @@ function shuffle(array) {
   }
   return array;
 }
-
-async function loadExternalShader() {
-  try {
-    const res = await fetch(`/api/interfaces/default/assets/shader?v=${view.assetVersion}`);
-    if (res.ok) {
-      shaderSource = await res.text();
-    } else {
-      shaderSource = internalFragmentShader;
-    }
-  } catch (e) {
-    shaderSource = internalFragmentShader;
-  }
-}
-
-$effect(() => {
-  const _ = view.assetVersion;
-  loadExternalShader();
-});
 
 $effect(() => {
   let palette = colors && colors.length > 0 ? [...colors] : [colorsState.palette.ok300];

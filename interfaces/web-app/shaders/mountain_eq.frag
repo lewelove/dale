@@ -154,13 +154,15 @@ void main() {
         finalOklab += iColorsOklab[i] * max(0.0, weightMask);
     }
     
-    finalOklab.x = 0.08 + (finalOklab.x * 0.8);
+    finalOklab.x = 0.04 + (finalOklab.x * 0.94);
     // finalOklab.x = 0.2 + (finalOklab.x * 0.6);
     
     vec3 finalColor = oklab_to_srgb(finalOklab);
 
-    float grain = (fract(sin(dot(uv, vec2(12.9898, 78.233))) * 43758.5453) - 0.5) * iGrain / 10.0;
+    float grain = (fract(sin(dot(uv, vec2(12.9898, 78.233))) * 43758.5453) - 0.5) * iGrain / 100.0;
     finalColor += grain;
     
     fragColor = vec4(finalColor, 1.0);
 }
+
+

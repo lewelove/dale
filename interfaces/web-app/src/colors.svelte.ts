@@ -1,3 +1,5 @@
+import appConfig from "../config.json";
+
 export interface PaletteConfig {
   ok100: string;
   ok200: string;
@@ -9,13 +11,7 @@ export interface PaletteConfig {
 export const colorsState = $state<{
   palette: PaletteConfig;
 }>({
-  palette: {
-    ok100: "oklch(1.00 0 0)",
-    ok200: "oklch(0.32 0 0)",
-    ok300: "oklch(0.26 0 0)",
-    ok400: "oklch(0.20 0 0)",
-    ok500: "oklch(0.14 0 0)"
-  }
+  palette: { ...appConfig.palette }
 });
 
 let probeEl: HTMLSpanElement | null = null;

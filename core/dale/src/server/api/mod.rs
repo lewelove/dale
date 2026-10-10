@@ -45,14 +45,6 @@ pub fn router(state: Arc<AppState>) -> Router {
         .route("/api/clear", post(playback::clear_queue))
         .route("/api/toggle-pause", post(playback::toggle_pause))
         .route("/api/update-album/{*id}", post(system::force_update_album))
-        .route(
-            "/api/interfaces/{name}/config",
-            get(system::get_interface_config),
-        )
-        .route(
-            "/api/interfaces/{name}/assets/{*path}",
-            get(system::serve_interface_asset),
-        )
         .route("/api/actions/{name}", any(actions::execute_action))
         .with_state(state)
 }
