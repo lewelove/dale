@@ -35,7 +35,7 @@ impl Commands {
         match self {
             Self::Harvest(cmd) => cmd.run(),
             Self::Server(cmd) => cmd.run().await,
-            Self::Interface(cmd) => cmd.run().await,
+            Self::Interface(cmd) => cmd.run(),
             Self::Compile(cmd) => cmd.run().await,
             Self::Update(cmd) => cmd.run().await,
             Self::Manifest(cmd) => cmd.run(),
@@ -104,8 +104,8 @@ struct InterfaceArgs {
 }
 
 impl InterfaceArgs {
-    async fn run(self) -> Result<()> {
-        interface::execute(self.name).await
+    fn run(self) -> Result<()> {
+        interface::execute(self.name)
     }
 }
 

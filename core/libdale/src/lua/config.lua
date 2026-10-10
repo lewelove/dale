@@ -6,16 +6,18 @@ _G.dale.config = function(t)
 end
 
 _G.dale.interface = function(name, t)
-    if type(t) == "boolean" then
-        if t == true then
-            REGISTRY.interfaces[name] = { enable = true, config = {}, assets = {} }
-        end
-    elseif type(t) == "table" then
-        t.enable = true
-        if t.config == nil then t.config = {} end
-        if t.assets == nil then t.assets = {} end
-        REGISTRY.interfaces[name] = t
+    if type(t) ~= "table" then
+        error(string.format("interface '%s': expected table, got %s", tostring(name), type(t)))
     end
+    local run_fn = t.run
+    if type(run_fn) ~= "function" then
+        error(string.format("interface '%s': missing 'run' function", tostring(name)))
+    end
+    REGISTRY.interfaces[name] = {
+        run = run_fn,
+        label = t.label or name,
+        description = t.description
+    }
 end
 
 _G.dale.action = function(name, t)

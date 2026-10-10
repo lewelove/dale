@@ -1,12 +1,10 @@
 use crate::server::state::AppState;
-use libdale::config::InterfaceConfig;
-use std::collections::{HashMap, HashSet};
+use std::collections::HashSet;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 pub struct ChangeFlags {
     pub config: bool,
-    pub interfaces_asset: HashSet<String>,
     pub changed_albums: HashSet<PathBuf>,
     pub vanished_paths: HashSet<PathBuf>,
 }
@@ -16,42 +14,6 @@ struct ClassifierContext<'a> {
     music_directory: &'a Path,
     deps: &'a HashSet<PathBuf>,
     deps_graph: &'a crate::server::state::DependencyGraph,
-    interface_assets: &'a [(String, PathBuf, bool)],
-}
-
-fn collect_interface_assets(
-    config_dir: &Path,
-    interfaces: &HashMap<String, InterfaceConfig>,
-) -> Vec<(String, PathBuf, bool)> {
-    let mut interface_assets = Vec::new();
-    for (name, cfg) in interfaces {
-        for asset_str in cfg.assets.values() {
-            let p = libdale::utils::expand_path(asset_str);
-            let p = if p.is_absolute() {
-                p
-            } else {
-                config_dir.join(p)
-            };
-            if let Ok(canon) = p.canonicalize() {
-                interface_assets.push((name.clone(), canon.clone(), canon.is_dir()));
-            }
-        }
-    }
-    interface_assets
-}
-
-fn check_interface_assets(
-    p_canon: &Path,
-    assets: &[(String, PathBuf, bool)],
-    set: &mut HashSet<String>,
-) {
-    for (name, asset_path, is_dir) in assets {
-        if (*is_dir && p_canon.starts_with(asset_path))
-            || (!*is_dir && p_canon == asset_path)
-        {
-            set.insert(name.clone());
-        }
-    }
 }
 
 fn classify_path_change(
@@ -103,14 +65,11 @@ fn classify_path_change(
             }
         }
     }
-
-    check_interface_assets(p_canon, ctx.interface_assets, &mut flags.interfaces_asset);
 }
 
 pub async fn classify_events(paths: &[PathBuf], state: &Arc<AppState>) -> ChangeFlags {
     let mut flags = ChangeFlags {
         config: false,
-        interfaces_asset: HashSet::new(),
         changed_albums: HashSet::new(),
         vanished_paths: HashSet::new(),
     };
@@ -120,7 +79,6 @@ pub async fn classify_events(paths: &[PathBuf], state: &Arc<AppState>) -> Change
     let config_dir = guard.config_dir.clone();
     let music_directory = guard.music_directory.clone();
     let deps: HashSet<PathBuf> = guard.resolved_dependencies.iter().cloned().collect();
-    let interface_assets = collect_interface_assets(&config_dir, &guard.interfaces);
     drop(guard);
 
     let ctx = ClassifierContext {
@@ -128,7 +86,6 @@ pub async fn classify_events(paths: &[PathBuf], state: &Arc<AppState>) -> Change
         music_directory: &music_directory,
         deps: &deps,
         deps_graph: &deps_graph,
-        interface_assets: &interface_assets,
     };
 
     let mut active = state

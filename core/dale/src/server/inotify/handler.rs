@@ -40,17 +40,6 @@ pub(super) fn filter_reingested_ids<S: std::hash::BuildHasher>(
 }
 
 pub async fn process_events(flags: ChangeFlags, state: &Arc<AppState>) {
-    for intf_name in flags.interfaces_asset {
-        log::info!("Interface '{intf_name}' asset changed.");
-        let _ = state.tx.send(
-            json!({
-                "type": "INTERFACE_ASSET_UPDATE",
-                "name": intf_name
-            })
-            .to_string(),
-        );
-    }
-
     if flags.config {
         handle_config_change(state).await;
     }
@@ -436,17 +425,6 @@ async fn handle_config_change(state: &Arc<AppState>) {
                 })
                 .to_string(),
             );
-
-            for (name, cfg) in &new_interfaces {
-                let _ = state.tx.send(
-                    json!({
-                        "type": "INTERFACE_CONFIG_UPDATE",
-                        "name": name,
-                        "config": cfg.config
-                    })
-                    .to_string(),
-                );
-            }
         }
         Err(e) => {
             log::error!("Failed to reload config: {e:?}");

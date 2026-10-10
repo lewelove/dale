@@ -1,55 +1,41 @@
 use anyhow::{Context, Result};
-use libdale::utils::expand_path;
-use std::process::Stdio;
+use serde_json::json;
 
-pub async fn execute(name: Option<String>) -> Result<()> {
+pub fn execute(name: Option<String>) -> Result<()> {
     let raw_name = name.unwrap_or_else(|| "default".to_string());
     let name = raw_name.replace('-', "_");
     let config = libdale::lua::ResolvedConfig::load().context("Failed to load config")?;
 
-    let mut intf_cfg = config.interfaces.get(&name).cloned().unwrap_or_default();
-
-    if name == "default" {
-        intf_cfg.enable = true;
+    if !config.interfaces.contains_key(&name) {
+        anyhow::bail!("Interface '{raw_name}' is not declared in configuration.");
     }
 
-    if !intf_cfg.enable {
-        anyhow::bail!("Interface '{raw_name}' is not enabled in config.");
-    }
+    let host = if config.app.server.host.is_empty() {
+        "127.0.0.1".to_string()
+    } else {
+        config.app.server.host.clone()
+    };
+    let port = if config.app.server.port == 0 {
+        8000
+    } else {
+        config.app.server.port
+    };
 
-    let dir_str = intf_cfg
-        .directory
-        .unwrap_or_else(|| format!("~/.local/share/dale/interfaces/{raw_name}"));
-    let dir_path = expand_path(&dir_str);
+    let url = format!("http://{host}:{port}");
+    let ws_url = format!("ws://{host}:{port}/ws");
 
-    let run_str = intf_cfg
-        .run
-        .unwrap_or_else(|| format!("{}/run.sh", dir_path.display()));
-    let run_path = expand_path(&run_str);
-
-    if !run_path.exists() {
-        anyhow::bail!("Run script not found at {}", run_path.display());
-    }
-
-    let mut child = tokio::process::Command::new("sh")
-        .arg(&run_path)
-        .current_dir(&dir_path)
-        .stdin(Stdio::inherit())
-        .stdout(Stdio::inherit())
-        .stderr(Stdio::inherit())
-        .spawn()
-        .context(format!(
-            "Failed to spawn interface script at {}",
-            run_path.display()
-        ))?;
-
-    tokio::select! {
-        res = child.wait() => {
-            res.context("Interface child process wait failed")?;
+    let ctx = json!({
+        "server": {
+            "host": host,
+            "port": port,
+            "url": url,
+            "ws_url": ws_url
         }
-        _ = tokio::signal::ctrl_c() => {
-            let _ = child.wait().await;
-        }
-    }
+    });
+
+    let engine = libdale::lua::LuaEngine::new()?;
+    engine.evaluate_config(&config.path)?;
+    engine.execute_interface(&name, &ctx)?;
+
     Ok(())
 }

@@ -74,7 +74,16 @@ end
 
 function __DALE_GET_CONFIG() return REGISTRY.config end
 function __DALE_GET_COVERS() return REGISTRY.covers end
-function __DALE_GET_INTERFACES() return REGISTRY.interfaces end
+function __DALE_GET_INTERFACES()
+    local result = {}
+    for name, intf in pairs(REGISTRY.interfaces or {}) do
+        result[name] = {
+            label = intf.label or name,
+            description = intf.description
+        }
+    end
+    return result
+end
 function __DALE_GET_ACTIONS()
     local result = {}
     for name, action in pairs(REGISTRY.actions or {}) do

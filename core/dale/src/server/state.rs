@@ -1,6 +1,6 @@
 use crate::server::logic::LogicEngine;
 use crate::server::mpd::MpdEngine;
-use libdale::config::{ActionDef, CoversRegistry, InterfaceConfig};
+use libdale::config::{ActionDef, CoversRegistry, InterfaceDef};
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
@@ -166,7 +166,7 @@ pub struct AppConfig {
     pub state_root: PathBuf,
     pub resolved_dependencies: Vec<PathBuf>,
     pub covers: CoversRegistry,
-    pub interfaces: HashMap<String, InterfaceConfig>,
+    pub interfaces: HashMap<String, InterfaceDef>,
     pub actions: HashMap<String, ActionDef>,
     pub config_dir: PathBuf,
     pub config_path: PathBuf,

@@ -13,6 +13,22 @@ const patch = function () { this.destroy(); };
   }
 });
 
+const targetUrl = process.env.DALE_SERVER_URL || 'http://127.0.0.1:8000';
+const wsTargetUrl = process.env.DALE_WS_URL || 'ws://127.0.0.1:8000';;
+
+const proxyConfig = {
+  '/api': {
+    target: targetUrl,
+    changeOrigin: true,
+    secure: false,
+    agent: new http.Agent({ keepAlive: true }),
+  },
+  '/ws': {
+    target: wsTargetUrl,
+    ws: true
+  }
+};
+
 export default defineConfig({
   plugins: [svelte()],
   resolve: {
@@ -22,17 +38,10 @@ export default defineConfig({
   },
   server: {
     port: 5173,
-    proxy: {
-      '/api': {
-        target: 'http://127.0.0.1:8000',
-        changeOrigin: true,
-        secure: false,
-        agent: new http.Agent({ keepAlive: true }),
-      },
-      '/ws': {
-        target: 'ws://127.0.0.1:8000',
-        ws: true
-      }
-    },
+    proxy: proxyConfig,
+  },
+  preview: {
+    port: 4173,
+    proxy: proxyConfig,
   },
 })

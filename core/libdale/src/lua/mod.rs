@@ -3,9 +3,7 @@ pub mod functions;
 #[cfg(test)]
 mod tests;
 
-use crate::config::{
-    ActionDef, AppConfig, CoversConfig, CoversRegistry, InterfaceConfig,
-};
+use crate::config::{ActionDef, AppConfig, CoversConfig, CoversRegistry, InterfaceDef};
 use crate::error::DaleError;
 use anyhow::{Context, Result};
 use indexmap::IndexMap;
@@ -235,7 +233,7 @@ pub struct LuaEngine {
 pub struct EvaluatedLuaData {
     pub app: AppConfig,
     pub covers: CoversRegistry,
-    pub interfaces: HashMap<String, InterfaceConfig>,
+    pub interfaces: HashMap<String, InterfaceDef>,
     pub actions: HashMap<String, ActionDef>,
     pub dependencies: Vec<PathBuf>,
     pub manifest: LogicManifest,
@@ -358,7 +356,7 @@ impl LuaEngine {
         }
 
         let covers: CoversRegistry = call_getter(&self.lua, "__DALE_GET_COVERS")?;
-        let interfaces: HashMap<String, InterfaceConfig> =
+        let interfaces: HashMap<String, InterfaceDef> =
             call_getter(&self.lua, "__DALE_GET_INTERFACES")?;
         let actions: HashMap<String, ActionDef> =
             call_getter(&self.lua, "__DALE_GET_ACTIONS")?;
@@ -389,6 +387,36 @@ impl LuaEngine {
             dependencies,
             manifest,
         })
+    }
+
+    pub fn execute_interface(&self, name: &str, ctx: &serde_json::Value) -> Result<()> {
+        let globals = self.lua.globals();
+        let registry: Table = globals
+            .get("REGISTRY")
+            .map_err(|e| anyhow::anyhow!("{e}"))?;
+        let interfaces: Table = registry
+            .get("interfaces")
+            .map_err(|e| anyhow::anyhow!("{e}"))?;
+        let interface_entry: Table = interfaces.get(name).map_err(|_| {
+            anyhow::anyhow!("Interface '{name}' is not declared in configuration.")
+        })?;
+        let run_fn: mlua::Function = interface_entry
+            .get("run")
+            .map_err(|_| anyhow::anyhow!("Interface '{name}' has no run function."))?;
+
+        let opts = SerializeOptions::new()
+            .serialize_none_to_null(false)
+            .serialize_unit_to_null(false);
+        let lua_ctx = self
+            .lua
+            .to_value_with(ctx, opts)
+            .map_err(|e| anyhow::anyhow!("{e}"))?;
+
+        run_fn
+            .call::<()>(lua_ctx)
+            .map_err(|e| anyhow::anyhow!("Error executing interface '{name}': {e}"))?;
+
+        Ok(())
     }
 
     pub fn execute_action(
@@ -611,7 +639,7 @@ pub fn resolve_config_path() -> Option<PathBuf> {
 pub struct ResolvedConfig {
     pub app: AppConfig,
     pub covers: CoversRegistry,
-    pub interfaces: HashMap<String, InterfaceConfig>,
+    pub interfaces: HashMap<String, InterfaceDef>,
     pub actions: HashMap<String, ActionDef>,
     pub dependencies: Vec<PathBuf>,
     pub manifest: LogicManifest,
@@ -667,28 +695,6 @@ impl ResolvedConfig {
                 crate::utils::resolve_path(&evaluated.app.storage.state, config_dir)
                     .to_string_lossy()
                     .to_string();
-        }
-
-        for intf in evaluated.interfaces.values_mut() {
-            if let Some(ref dir) = intf.directory {
-                intf.directory = Some(
-                    crate::utils::resolve_path(dir, config_dir)
-                        .to_string_lossy()
-                        .to_string(),
-                );
-            }
-            if let Some(ref run_script) = intf.run {
-                intf.run = Some(
-                    crate::utils::resolve_path(run_script, config_dir)
-                        .to_string_lossy()
-                        .to_string(),
-                );
-            }
-            for asset_path in intf.assets.values_mut() {
-                *asset_path = crate::utils::resolve_path(asset_path, config_dir)
-                    .to_string_lossy()
-                    .to_string();
-            }
         }
 
         let mut dependencies = evaluated.dependencies;

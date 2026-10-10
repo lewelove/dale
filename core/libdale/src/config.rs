@@ -1,5 +1,4 @@
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
 
 #[derive(Debug, Deserialize, Serialize, Clone, Default)]
 pub struct AppConfig {
@@ -9,6 +8,24 @@ pub struct AppConfig {
     pub manifest: ManifestConfig,
     #[serde(default)]
     pub compiler: CompilerConfig,
+    #[serde(default)]
+    pub server: ServerConfig,
+}
+
+#[derive(Debug, Deserialize, Serialize, Clone)]
+#[serde(default)]
+pub struct ServerConfig {
+    pub host: String,
+    pub port: u16,
+}
+
+impl Default for ServerConfig {
+    fn default() -> Self {
+        Self {
+            host: "127.0.0.1".to_string(),
+            port: 8000,
+        }
+    }
 }
 
 #[derive(Debug, Deserialize, Serialize, Clone, Default)]
@@ -19,15 +36,10 @@ pub struct ActionDef {
 }
 
 #[derive(Debug, Deserialize, Serialize, Clone, Default)]
-pub struct InterfaceConfig {
+pub struct InterfaceDef {
+    pub label: String,
     #[serde(default)]
-    pub enable: bool,
-    pub directory: Option<String>,
-    pub run: Option<String>,
-    #[serde(default)]
-    pub config: serde_json::Value,
-    #[serde(default)]
-    pub assets: HashMap<String, String>,
+    pub description: Option<String>,
 }
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
