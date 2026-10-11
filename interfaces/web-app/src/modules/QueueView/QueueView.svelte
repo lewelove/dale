@@ -29,10 +29,21 @@ let activeForeground = $derived(isShaderOn && foregroundColor ? foregroundColor 
 
 let queueContainerStyle = $derived(
   activeForeground
-    ? `--text-main: ${activeForeground}; --text-muted: ${activeForeground}; --text-subtle: ${activeForeground};`
+    ? [
+        `--text-main: ${activeForeground}`,
+        `--text-muted: color-mix(in srgb, ${activeForeground} 66%, transparent)`,
+        `--text-subtle: color-mix(in srgb, ${activeForeground} 50%, transparent)`,
+        `--border-muted: color-mix(in srgb, ${activeForeground} 8%, transparent)`,
+        `--bg-surface-hover: color-mix(in srgb, ${activeForeground} 5%, transparent)`,
+        `--bg-surface-active: color-mix(in srgb, ${activeForeground} 8%, transparent)`,
+        `--bg-item-hover: color-mix(in srgb, ${activeForeground} 8%, transparent)`,
+        `--bg-item-active: color-mix(in srgb, ${activeForeground} 8%, transparent)`,
+        `--bg-button-inactive: color-mix(in srgb, ${activeForeground} 8%, transparent)`,
+        `--bg-button-hover: color-mix(in srgb, ${activeForeground} 16%, transparent)`,
+        `--bg-button-active: color-mix(in srgb, ${activeForeground} 16%, transparent)`
+      ].join("; ")
     : ""
 );
-
 let isViewVisible = $derived(nav.activeTab === "queue");
 let isPlaying = $derived(player.state === "play");
 
