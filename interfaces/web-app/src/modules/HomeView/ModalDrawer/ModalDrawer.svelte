@@ -182,7 +182,6 @@ function handleBackdropClick(e: MouseEvent) {
           </div>
         </div>
         <div class="tracks-scroll-area">
-          <div class="v-scroll-fade-top"></div>
           <ModalDrawerTracks
             tracks={album.tracks || []}
             totalDiscs={infoData.total_discs}
@@ -190,7 +189,6 @@ function handleBackdropClick(e: MouseEvent) {
             onplay={handlePlayTrack}
             onplaydisc={handlePlayDisc}
           />
-          <div class="v-scroll-fade-bottom"></div>
         </div>
       </div>
     </div>
@@ -338,9 +336,19 @@ function handleBackdropClick(e: MouseEvent) {
   background-color: var(--bg-panel);
   transform: translateZ(0);
   border-bottom: 1px solid var(--border-muted);
+  padding: 12px 0;
+  scrollbar-width: none;
+  mask-image: linear-gradient(
+    to bottom,
+    transparent 0,
+    black 12px,
+    black calc(100% - 12px),
+    transparent 100%
+  );
 }
 
 .tracks-scroll-area::-webkit-scrollbar {
   width: 0;
 }
 </style>
+

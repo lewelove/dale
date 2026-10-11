@@ -445,7 +445,6 @@ function toggleExpand(value: string) {
 
   <div class="v-sidebar-body">
     <div class="v-sidebar-scroll" bind:this={scrollContainer}>
-      <div class="v-scroll-fade-top"></div>
       {#if isCabinetsMode}
         {#each visibleShelves as shelf (shelf.key)}
           <button
@@ -462,8 +461,6 @@ function toggleExpand(value: string) {
           {@render TreeNode(item, String(i), 0)}
         {/each}
       {/if}
-      <div class="scroll-spacer"></div>
-      <div class="v-scroll-fade-bottom"></div>
     </div>
 
     {#if !isCabinetsMode && items.length > 0 && showIndex}
@@ -479,10 +476,5 @@ function toggleExpand(value: string) {
 
 .order-arrow.mirrored {
   transform: scaleY(-1);
-}
-
-.scroll-spacer {
-  height: 12px;
-  flex-shrink: 0;
 }
 </style>

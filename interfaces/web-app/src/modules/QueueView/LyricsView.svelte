@@ -7,6 +7,8 @@ let {
   file?: string | null;
 } = $props();
 
+let scrollEl: HTMLDivElement | undefined = $state();
+
 let isInstrumental = $derived(track?.keys?.instrumental === true);
 
 let lyricsText = $derived.by(() => {
@@ -21,9 +23,16 @@ let lyricsText = $derived.by(() => {
   }
   return "";
 });
+
+$effect(() => {
+  void file;
+  if (scrollEl) {
+    scrollEl.scrollTop = 0;
+  }
+});
 </script>
 
-<div class="lyrics-scroll">
+<div bind:this={scrollEl} class="lyrics-scroll">
   {#key file}
     {#if isInstrumental}
       <div class="instrumental-msg">INSTRUMENTAL</div>
@@ -45,6 +54,14 @@ let lyricsText = $derived.by(() => {
   min-height: 0;
   display: flex;
   flex-direction: column;
+  scrollbar-width: none;
+  mask-image: linear-gradient(
+    to bottom,
+    transparent 0,
+    black 16px,
+    black calc(100% - 16px),
+    transparent 100%
+  );
 }
 
 .lyrics-scroll::-webkit-scrollbar {
@@ -57,7 +74,7 @@ let lyricsText = $derived.by(() => {
   line-height: 1.05;
   color: var(--text-main);
   text-align: center;
-  margin: -6px auto;
+  padding: 16px 0;
   width: 100%;
 }
 

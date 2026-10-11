@@ -372,10 +372,17 @@ main {
   position: relative;
   flex: 1;
   overflow-y: scroll;
-  padding: 0;
+  padding: 12px 0;
   min-height: 0;
   scrollbar-width: none;
   -ms-overflow-style: none;
+  mask-image: linear-gradient(
+    to bottom,
+    transparent 0,
+    black 12px,
+    black calc(100% - 12px),
+    transparent 100%
+  );
 }
 
 .v-sidebar-scroll::-webkit-scrollbar {
@@ -500,28 +507,6 @@ main {
   font-family: var(--font-mono);
   flex-shrink: 0;
   white-space: nowrap;
-}
-
-.v-scroll-fade-top {
-  position: sticky;
-  top: 0;
-  left: 0;
-  right: 0;
-  height: 12px;
-  background: linear-gradient(to bottom, var(--bg-panel) 0%, transparent 100%);
-  z-index: 10;
-  pointer-events: none;
-}
-
-.v-scroll-fade-bottom {
-  position: sticky;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  height: 12px;
-  background: linear-gradient(to top, var(--bg-panel) 0%, transparent 100%);
-  z-index: 10;
-  pointer-events: none;
 }
 
 .v-track-row {
