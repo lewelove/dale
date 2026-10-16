@@ -6,6 +6,7 @@ import { config } from "../../../config.svelte.ts";
 import { canvasColors } from "../../../colors.svelte.ts";
 import { collection } from "../../../library/collection.svelte.ts";
 import { prewarmer } from "../../../library/prewarmer.svelte.ts";
+import type { AlbumCardItem } from "../../../types.ts";
 
 let {
   albums = [],
@@ -14,11 +15,11 @@ let {
   activeAlbumId = null,
   onfocus = () => {}
 }: {
-  albums?: any[];
+  albums?: AlbumCardItem[];
   version?: number;
   resetVersion?: number;
   activeAlbumId?: string | null;
-  onfocus?: (album: any) => void;
+  onfocus?: (album: AlbumCardItem) => void;
 } = $props();
 
 const ctrl = new GridController();
@@ -32,16 +33,41 @@ let ctx: CanvasRenderingContext2D | null = null;
 const activeKeys = new SvelteSet<string>();
 const SCROLL_SPEED = 0.2;
 
-let hoveredAlbum: any = null;
+let hoveredAlbum: AlbumCardItem | null = null;
 let textCache = new SvelteMap<string, HTMLCanvasElement>();
-let emptyCoverCanvas: any = null;
+
+interface ShadowCanvasCache {
+  canvas: HTMLCanvasElement;
+  size: number;
+  dpr: number;
+  pad: number;
+}
+let emptyCoverCanvas: ShadowCanvasCache | null = null;
 let isTabVisible = true;
 
+interface TextConfig {
+  enable: boolean;
+  spacing: {
+    top: number;
+    middle: number;
+  };
+  title: {
+    size: number;
+  };
+  albumartist: {
+    size: number;
+  };
+}
+
 function fitText(cCtx: CanvasRenderingContext2D, text: string, maxWidth: number) {
-  if (!text) return "";
-  let ellipsis = "...";
-  let fullWidth = cCtx.measureText(text).width;
-  if (fullWidth <= maxWidth) return text;
+  if (!text) {
+    return "";
+  }
+  const ellipsis = "...";
+  const fullWidth = cCtx.measureText(text).width;
+  if (fullWidth <= maxWidth) {
+    return text;
+  }
 
   let low = 0;
   let high = text.length;
@@ -63,16 +89,29 @@ function fitText(cCtx: CanvasRenderingContext2D, text: string, maxWidth: number)
   return text.substring(0, bestLen) + ellipsis;
 }
 
-function getTextCanvas(album: any, coverSize: number, textBlockHeight: number, textConfig: any) {
-  if (textBlockHeight <= 0) return null;
-  const cacheKey = `${album.id}:${album.title}:${album.artist}`;
-  if (textCache.has(cacheKey)) return textCache.get(cacheKey)!;
+function getTextCanvas(
+  album: AlbumCardItem,
+  coverSize: number,
+  textBlockHeight: number,
+  textConfig: TextConfig
+) {
+  if (textBlockHeight <= 0) {
+    return null;
+  }
+  const albumTitle = album.title || "";
+  const albumArtist = album.artist || "";
+  const cacheKey = `${album.id}:${albumTitle}:${albumArtist}`;
+  if (textCache.has(cacheKey)) {
+    return textCache.get(cacheKey)!;
+  }
 
   const c = document.createElement("canvas");
   c.width = coverSize * dpr;
   c.height = textBlockHeight * dpr;
   const cCtx = c.getContext("2d", { alpha: false });
-  if (!cCtx) return c;
+  if (!cCtx) {
+    return c;
+  }
 
   cCtx.scale(dpr, dpr);
 
@@ -87,7 +126,7 @@ function getTextCanvas(album: any, coverSize: number, textBlockHeight: number, t
   const lhTitle = Math.round(sTitle * 1.2);
   cCtx.font = `400 ${sTitle}px ${fontStack}`;
   cCtx.textBaseline = "middle";
-  const titleText = fitText(cCtx, album.title, coverSize);
+  const titleText = fitText(cCtx, albumTitle, coverSize);
   cCtx.fillText(titleText, 0, lhTitle / 2);
 
   cCtx.fillStyle = canvasColors.artist;
@@ -96,7 +135,7 @@ function getTextCanvas(album: any, coverSize: number, textBlockHeight: number, t
   const lhArtist = Math.round(sArtist * 1.2);
   cCtx.font = `400 ${sArtist}px ${fontStack}`;
   const artistY = lhTitle + gapLesser + lhArtist / 2;
-  const artistText = fitText(cCtx, album.artist, coverSize);
+  const artistText = fitText(cCtx, albumArtist, coverSize);
   cCtx.fillText(artistText, 0, artistY);
 
   cCtx.globalAlpha = 1.0;
@@ -105,16 +144,19 @@ function getTextCanvas(album: any, coverSize: number, textBlockHeight: number, t
   return c;
 }
 
-function getEmptyCoverCanvas(size: number) {
-  if (emptyCoverCanvas && emptyCoverCanvas.size === size && emptyCoverCanvas.dpr === dpr)
+function getEmptyCoverCanvas(size: number): ShadowCanvasCache {
+  if (emptyCoverCanvas && emptyCoverCanvas.size === size && emptyCoverCanvas.dpr === dpr) {
     return emptyCoverCanvas;
+  }
 
   const pad = 24;
   const c = document.createElement("canvas");
   c.width = (size + pad * 2) * dpr;
   c.height = (size + pad * 2) * dpr;
   const cCtx = c.getContext("2d");
-  if (!cCtx) return { canvas: c, size, dpr, pad };
+  if (!cCtx) {
+    return { canvas: c, size, dpr, pad };
+  }
 
   cCtx.scale(dpr, dpr);
 
@@ -140,14 +182,20 @@ function getEmptyCoverCanvas(size: number) {
 }
 
 function renderCanvas() {
-  if (!canvasEl) return;
+  if (!canvasEl) {
+    return;
+  }
   if (!ctx) {
     ctx = canvasEl.getContext("2d", { alpha: false });
-    if (!ctx) return;
+    if (!ctx) {
+      return;
+    }
   }
   const w = ctrl.layout.containerWidth;
   const h = ctrl.viewportHeight;
-  if (w === 0 || h === 0) return;
+  if (w === 0 || h === 0) {
+    return;
+  }
 
   const currentDpr = window.devicePixelRatio || 1;
   if (
@@ -186,10 +234,14 @@ function renderCanvas() {
   const rows = ctrl.virtualRows;
 
   for (const row of rows) {
-    if (!row || !row.data) continue;
+    if (!row || !row.data) {
+      continue;
+    }
 
     const rowY = row.y - scrollY;
-    if (rowY + ctrl.layout.rowHeight < -100 || rowY > h + 100) continue;
+    if (rowY + ctrl.layout.rowHeight < -100 || rowY > h + 100) {
+      continue;
+    }
 
     for (let i = 0; i < row.data.length; i++) {
       const album = row.data[i];
@@ -257,10 +309,16 @@ function loop() {
   }
 
   let delta = 0;
-  if (activeKeys.has("j") || activeKeys.has("arrowdown")) delta += SCROLL_SPEED;
-  if (activeKeys.has("k") || activeKeys.has("arrowup")) delta -= SCROLL_SPEED;
+  if (activeKeys.has("j") || activeKeys.has("arrowdown")) {
+    delta += SCROLL_SPEED;
+  }
+  if (activeKeys.has("k") || activeKeys.has("arrowup")) {
+    delta -= SCROLL_SPEED;
+  }
 
-  if (delta !== 0) ctrl.scrollRow(delta);
+  if (delta !== 0) {
+    ctrl.scrollRow(delta);
+  }
 
   ctrl.update(dpr);
   renderCanvas();
@@ -272,29 +330,37 @@ function handleVisibilityChange() {
   isTabVisible = !document.hidden;
 }
 
-function getAlbumAt(clientX: number, clientY: number) {
+function getAlbumAt(clientX: number, clientY: number): AlbumCardItem | null {
   const { gapX, gapY, cardSize, rowHeight, gridWidth, cols, topOffset } = ctrl.layout;
   const w = ctrl.layout.containerWidth;
   const startX = Math.floor((w - gridWidth) / 2);
 
   const localGridX = clientX - startX;
-  if (localGridX < 0 || localGridX > gridWidth) return null;
+  if (localGridX < 0 || localGridX > gridWidth) {
+    return null;
+  }
 
   const colIndex = Math.floor(localGridX / (cardSize + gapX));
   const localX = localGridX - colIndex * (cardSize + gapX);
-  if (localX > cardSize) return null;
+  if (localX > cardSize) {
+    return null;
+  }
 
   const scrollY = ctrl.scroll.currentY;
   const absoluteY = clientY + scrollY;
 
   const adjustedY = absoluteY - topOffset;
-  if (adjustedY < 0) return null;
+  if (adjustedY < 0) {
+    return null;
+  }
 
   const rowIndex = Math.floor(adjustedY / rowHeight);
   const rowYPos = rowIndex * rowHeight + topOffset;
   const localY = absoluteY - rowYPos;
 
-  if (localY < gapY || localY > gapY + cardSize) return null;
+  if (localY < gapY || localY > gapY + cardSize) {
+    return null;
+  }
 
   if (rowIndex < ctrl.allRows.length && colIndex < cols) {
     const row = ctrl.allRows[rowIndex];
@@ -306,8 +372,12 @@ function getAlbumAt(clientX: number, clientY: number) {
 }
 
 function handleKeydown(e: KeyboardEvent) {
-  if (["INPUT", "TEXTAREA"].includes(document.activeElement?.tagName ?? "")) return;
-  if (activeAlbumId) return;
+  if (["INPUT", "TEXTAREA"].includes(document.activeElement?.tagName ?? "")) {
+    return;
+  }
+  if (activeAlbumId) {
+    return;
+  }
 
   const key = e.key.toLowerCase();
   if (["j", "k", "arrowdown", "arrowup"].includes(key)) {
@@ -318,7 +388,9 @@ function handleKeydown(e: KeyboardEvent) {
 
 function handleKeyup(e: KeyboardEvent) {
   const key = e.key.toLowerCase();
-  if (activeKeys.has(key)) activeKeys.delete(key);
+  if (activeKeys.has(key)) {
+    activeKeys.delete(key);
+  }
 }
 
 function handleBlur() {
@@ -326,7 +398,9 @@ function handleBlur() {
 }
 
 function handlePointerMove(e: PointerEvent) {
-  if (activeAlbumId || !canvasEl) return;
+  if (activeAlbumId || !canvasEl) {
+    return;
+  }
   const rect = canvasEl.getBoundingClientRect();
   const x = e.clientX - rect.left;
   const y = e.clientY - rect.top;
@@ -346,7 +420,9 @@ function handlePointerLeave() {
 }
 
 function handleClick(e: MouseEvent) {
-  if (activeAlbumId || !canvasEl) return;
+  if (activeAlbumId || !canvasEl) {
+    return;
+  }
   const rect = canvasEl.getBoundingClientRect();
   const x = e.clientX - rect.left;
   const y = e.clientY - rect.top;
@@ -373,8 +449,8 @@ $effect(() => {
 });
 
 $effect(() => {
-  const _v = version;
-  const _a = albums;
+  void version;
+  void albums;
   textCache.clear();
 });
 
@@ -386,10 +462,10 @@ $effect(() => {
 });
 
 $effect(() => {
-  const _c = config.album_grid;
-  const _bg = canvasColors.bg;
-  const _title = canvasColors.title;
-  const _artist = canvasColors.artist;
+  void config.album_grid;
+  void canvasColors.bg;
+  void canvasColors.title;
+  void canvasColors.artist;
   textCache.clear();
   emptyCoverCanvas = null;
 });
@@ -412,7 +488,9 @@ onDestroy(() => {
   window.removeEventListener("keyup", handleKeyup);
   window.removeEventListener("blur", handleBlur);
   document.removeEventListener("visibilitychange", handleVisibilityChange);
-  if (rafId) cancelAnimationFrame(rafId);
+  if (rafId) {
+    cancelAnimationFrame(rafId);
+  }
 });
 </script>
 
@@ -422,7 +500,9 @@ onDestroy(() => {
     bind:clientWidth={ctrl.layout.containerWidth}
     bind:clientHeight={ctrl.viewportHeight}
     onwheel={(e) => {
-      if (activeAlbumId) return;
+      if (activeAlbumId) {
+        return;
+      }
       e.preventDefault();
       ctrl.handleWheel(e);
     }}

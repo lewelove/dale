@@ -30,7 +30,7 @@ class SyncEngine extends EventTarget {
         const raw = event.data instanceof Blob ? await event.data.text() : event.data;
         const data = JSON.parse(raw);
         this.dispatchEvent(new CustomEvent("message", { detail: data }));
-      } catch (err) {}
+      } catch {}
     };
 
     socket.onclose = () => {
@@ -48,14 +48,16 @@ class SyncEngine extends EventTarget {
   }
 
   private scheduleReconnect() {
-    if (this._reconnectTimer) return;
+    if (this._reconnectTimer) {
+      return;
+    }
     this._reconnectTimer = setTimeout(() => {
       this._reconnectTimer = null;
       this.connect();
     }, 2000);
   }
 
-  send(payload: any) {
+  send(payload: unknown) {
     if (this._ws && this._ws.readyState === WebSocket.OPEN) {
       this._ws.send(JSON.stringify(payload));
     }

@@ -8,7 +8,7 @@ import ModalDrawer from "./ModalDrawer/ModalDrawer.svelte";
 
 let isResizing = $state(false);
 
-let isModalVisible = $derived(!!view.focusedAlbum);
+let isModalVisible = $derived(Boolean(view.focusedAlbum));
 
 function startResizing() {
   isResizing = true;
@@ -56,7 +56,7 @@ function startResizing() {
     </aside>
   </div>
 
-  {#if isModalVisible}
+  {#if view.focusedAlbum}
     <div class="modal-layer">
       <ModalDrawer album={view.focusedAlbum} onclose={() => view.closeFocus()} />
     </div>

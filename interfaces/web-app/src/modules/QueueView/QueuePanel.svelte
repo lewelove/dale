@@ -4,9 +4,10 @@ import { collection } from "../../library/collection.svelte.ts";
 import PanelShell from "./PanelShell.svelte";
 import QueueHeader from "./QueueHeader.svelte";
 import TracklistView from "./TracklistView.svelte";
+import type { MappedQueueTrack, QueueGroup } from "../../types.ts";
 
 let mappedTracks = $derived(
-  player.queue.map((item) => {
+  player.queue.map((item): MappedQueueTrack => {
     const fullAlbum = item.album_id ? collection.fullAlbumCache[item.album_id] : null;
     const meta =
       item.track_index !== null && item.track_index !== undefined && fullAlbum?.tracks
@@ -19,20 +20,20 @@ let mappedTracks = $derived(
       isPlaying: player.currentFile === item.file,
       trackNo: meta ? meta.tracknumber : item.track_no ?? "#",
       discNo: meta ? meta.discnumber : item.disc_no ?? 1,
-      duration: meta ? meta.info?.duration_formatted : item.duration ?? "",
-      durationMs: meta ? meta.info?.duration_milliseconds : item.duration_ms ?? 0,
+      duration: meta ? meta.info?.duration_formatted ?? "" : item.duration ?? "",
+      durationMs: meta ? Number(meta.info?.duration_milliseconds ?? 0) : item.duration_ms ?? 0,
       title: meta ? meta.title : item.title || item.file,
-      artist: meta ? meta.artist : item.artist || "",
+      artist: meta ? meta.artist ?? "" : item.artist || "",
       albumId: item.album_id || null
     };
   })
 );
 
 let groupedQueue = $derived.by(() => {
-  const groups: any[] = [];
+  const groups: QueueGroup[] = [];
   mappedTracks.forEach((track) => {
     if (groups.length === 0 || groups[groups.length - 1].albumId !== track.albumId) {
-      const albumMeta = collection.dict[track.albumId];
+      const albumMeta = track.albumId ? collection.dict[track.albumId] ?? null : null;
       groups.push({
         albumId: track.albumId,
         albumMeta,

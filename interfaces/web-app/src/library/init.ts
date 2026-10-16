@@ -6,7 +6,7 @@ import { initColors } from "../colors.svelte.ts";
 import appConfig from "../../config.json";
 
 export function initApp() {
-  prewarmer;
+  prewarmer.pruneTextures();
 
   initColors();
   sync.connect();

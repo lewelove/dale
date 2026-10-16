@@ -82,7 +82,7 @@ in
     ln -sf "${pySearchCover}/bin/search_cover" "$ROOT/actions/search_cover"
     ln -sf "${pyRename}/bin/rename" "$ROOT/actions/rename"
 
-    (cd "$ROOT/interfaces/web-app" && bun run build)
+    (cd "$ROOT/interfaces/web-app" && bun run check && bun run lint:logic && bun run build)
   '';
 
   scripts.check.exec = ''
@@ -90,5 +90,6 @@ in
     cd "$ROOT"
 
     cargo check --workspace "$@"
+    (cd "$ROOT/interfaces/web-app" && bun run check && bun run lint:logic)
   '';
 }

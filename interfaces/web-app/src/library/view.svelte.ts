@@ -3,19 +3,28 @@ import { collection } from "./collection.svelte.ts";
 import { nav } from "../navigation.svelte.ts";
 import { player } from "../modules/player.svelte.ts";
 import { applyPersistedState, persistState } from "./persistence.svelte.ts";
+import type {
+  AlbumCardItem,
+  FilterState,
+  FullAlbum,
+  GrouperTreeNode,
+  LibraryState,
+  SortState,
+  WsMessage
+} from "../types.ts";
 
 export class ViewState {
   isLoading: boolean = $state(true);
   isConnected: boolean = $state(false);
   homeSubView: "libraries" | "cabinets" = $state("libraries");
 
-  focusedAlbum: any = $state(null);
+  focusedAlbum: FullAlbum | null = $state(null);
 
   activeLibrary: string = $state("library");
   activeCabinet: string = $state("default");
   activeLibraryFilter: string | null = $state(null);
-  activeFilter: { key: string | null; val: string | null } = $state({ key: null, val: null });
-  activeSort: { key: string | null; order: string } = $state({ key: null, order: "default" });
+  activeFilter: FilterState = $state({ key: null, val: null });
+  activeSort: SortState = $state({ key: null, order: "default" });
   userSortPreference: string | null = $state(null);
   userSortOrder: string = $state("default");
   activeSidebarGrouper: string | null = $state(null);
@@ -23,7 +32,7 @@ export class ViewState {
   activeShelfOrder: string = $state("original");
   activeShelfOrderReverse: boolean = $state(false);
   shelfViewIds: string[] = $state([]);
-  librariesState: Record<string, any> = $state({});
+  librariesState: Record<string, LibraryState> = $state({});
   libraryVersion: number = $state(0);
   libraryResetVersion: number = $state(0);
   shelfVersion: number = $state(0);
@@ -33,15 +42,15 @@ export class ViewState {
   isFocusInstant: boolean = $state(false);
   _pendingViewReset: boolean = false;
 
-  libraryAlbums = $derived.by(() => {
-    const _v = this.libraryVersion;
-    const _d = collection.dict;
+  libraryAlbums = $derived.by((): AlbumCardItem[] => {
+    void this.libraryVersion;
+    void collection.dict;
     return collection.mapIdsToAlbums(collection.libraryViewIds);
   });
 
-  shelfAlbums = $derived.by(() => {
-    const _v = this.shelfVersion;
-    const _d = collection.dict;
+  shelfAlbums = $derived.by((): AlbumCardItem[] => {
+    void this.shelfVersion;
+    void collection.dict;
     return collection.mapIdsToAlbums(this.shelfViewIds);
   });
 
@@ -52,7 +61,9 @@ export class ViewState {
     sync.addEventListener("close", () => {
       this.isConnected = false;
     });
-    sync.addEventListener("message", (e: Event) => this.handleMessage((e as CustomEvent).detail));
+    sync.addEventListener("message", (e: Event) => {
+      this.handleMessage((e as CustomEvent<WsMessage>).detail);
+    });
   }
 
   validateAndNormalizeLibrary() {
@@ -69,7 +80,7 @@ export class ViewState {
     if (libDef) {
       if (
         libDef.allowed_filters &&
-        !libDef.allowed_filters.includes(this.activeLibraryFilter)
+        !libDef.allowed_filters.includes(this.activeLibraryFilter || "")
       ) {
         this.activeLibraryFilter =
           libDef.allowed_filters.length > 0 ? libDef.allowed_filters[0] : null;
@@ -79,7 +90,7 @@ export class ViewState {
 
       if (
         libDef.allowed_groupers &&
-        !libDef.allowed_groupers.includes(this.activeSidebarGrouper)
+        !libDef.allowed_groupers.includes(this.activeSidebarGrouper || "")
       ) {
         this.activeSidebarGrouper =
           libDef.allowed_groupers.length > 0 ? libDef.allowed_groupers[0] : null;
@@ -94,7 +105,10 @@ export class ViewState {
         this.activeFilter = { key: null, val: null };
       }
 
-      if (libDef.allowed_orders && !libDef.allowed_orders.includes(this.userSortPreference)) {
+      if (
+        libDef.allowed_orders &&
+        !libDef.allowed_orders.includes(this.userSortPreference || "")
+      ) {
         this.userSortPreference =
           libDef.allowed_orders.length > 0 ? libDef.allowed_orders[0] : null;
         this.activeSort = { key: this.userSortPreference, order: this.userSortOrder };
@@ -105,7 +119,7 @@ export class ViewState {
     }
   }
 
-  handleMessage(json: any) {
+  handleMessage(json: WsMessage) {
     if (json.type === "INIT_DICT") {
       if (json.ui_state) {
         applyPersistedState(json.ui_state, this);
@@ -147,7 +161,8 @@ export class ViewState {
         const focusedId = this.focusedAlbum.id;
         const isRemoved =
           (json.type === "ALBUM_REMOVED" && json.id === focusedId) ||
-          (json.removed &&
+          (json.type === "ALBUMS_UPDATED" &&
+            json.removed &&
             json.removed.includes(focusedId) &&
             (!json.updated || !json.updated[focusedId]));
 
@@ -156,7 +171,7 @@ export class ViewState {
         } else {
           const isUpdated =
             (json.type === "ALBUM_UPDATED" && json.id === focusedId) ||
-            (json.updated && json.updated[focusedId]);
+            (json.type === "ALBUMS_UPDATED" && json.updated && json.updated[focusedId]);
           if (isUpdated) {
             delete collection.fullAlbumCache[focusedId];
             collection.ensureFullAlbum(focusedId).then((data) => {
@@ -179,8 +194,10 @@ export class ViewState {
     return this.isShaderEnabled && player.state !== "stop";
   }
 
-  getSidebarGroup(key: string | null): any[] {
-    if (!key) return [];
+  getSidebarGroup(key: string | null): GrouperTreeNode[] {
+    if (!key) {
+      return [];
+    }
     if (!collection.sidebarGroups.has(key) && sync.isOpen) {
       this.refreshSidebar();
       return [];
@@ -189,7 +206,9 @@ export class ViewState {
   }
 
   saveCurrentLibraryState() {
-    if (!this.activeLibrary) return;
+    if (!this.activeLibrary) {
+      return;
+    }
     this.librariesState[this.activeLibrary] = {
       activeLibraryFilter: this.activeLibraryFilter,
       activeFilter: $state.snapshot(this.activeFilter),
@@ -226,11 +245,15 @@ export class ViewState {
     ) {
       state.activeFilter = { key: null, val: null };
     }
-    if (!state.userSortOrder) state.userSortOrder = "default";
+    if (!state.userSortOrder) {
+      state.userSortOrder = "default";
+    }
     if (!state.activeSort || state.activeSort.key !== state.userSortPreference) {
       state.activeSort = { key: state.userSortPreference, order: state.userSortOrder };
     }
-    if (!state.activeFilter) state.activeFilter = { key: null, val: null };
+    if (!state.activeFilter) {
+      state.activeFilter = { key: null, val: null };
+    }
 
     this.activeLibraryFilter = state.activeLibraryFilter;
     this.activeSidebarGrouper = state.activeSidebarGrouper;
@@ -240,7 +263,9 @@ export class ViewState {
   }
 
   refreshView(resetScroll: boolean = true) {
-    if (!sync.isOpen) return;
+    if (!sync.isOpen) {
+      return;
+    }
     this._pendingViewReset = resetScroll;
 
     if (nav.activeTab === "home" && this.homeSubView === "cabinets") {
@@ -280,7 +305,9 @@ export class ViewState {
   }
 
   refreshSidebar() {
-    if (!sync.isOpen || !this.activeSidebarGrouper) return;
+    if (!sync.isOpen || !this.activeSidebarGrouper) {
+      return;
+    }
     sync.send({
       type: "GROUP_REQUEST",
       library: this.activeLibrary,
@@ -373,7 +400,7 @@ export class ViewState {
     this.persistState();
   }
 
-  async setFocus(album: any, instant: boolean = false) {
+  async setFocus(album: { id: string }, instant: boolean = false) {
     if (this.focusedAlbum?.id === album.id) {
       this.isFocusInstant = instant;
       return;
@@ -396,12 +423,12 @@ export class ViewState {
             date: dictEntry.date,
             keys: dictEntry.keys,
             colors: dictEntry.colors,
-            covers: {
-              main: {
-                file: {
-                  address: dictEntry.cover_hash
+            covers: dictEntry.covers || {
+              main: [
+                {
+                  address: dictEntry.cover_hash || ""
                 }
-              }
+              ]
             },
             info: {
               virtual: dictEntry.virtual,
@@ -413,7 +440,7 @@ export class ViewState {
           tracks: []
         };
       } else {
-        this.focusedAlbum = { id: album.id, album: {}, tracks: [] };
+        this.focusedAlbum = { id: album.id, album: { id: album.id }, tracks: [] };
       }
 
       const full = await collection.ensureFullAlbum(album.id);

@@ -1,9 +1,11 @@
 <script lang="ts">
+import type { TrackItem } from "../../types.ts";
+
 let {
   track = null,
   file = null
 }: {
-  track?: any;
+  track?: TrackItem | null;
   file?: string | null;
 } = $props();
 
@@ -18,7 +20,7 @@ let lyricsText = $derived.by(() => {
   if (track.lyrics?.text) {
     return track.lyrics.text;
   }
-  if (track.keys?.lyrics) {
+  if (typeof track.keys?.lyrics === "string") {
     return track.keys.lyrics;
   }
   return "";

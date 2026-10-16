@@ -30,19 +30,19 @@ $effect(() => {
 async function togglePlay() {
   try {
     await fetch("/api/toggle-pause", { method: "POST" });
-  } catch (e) {}
+  } catch {}
 }
 
 async function next() {
   try {
     await fetch("/api/next", { method: "POST" });
-  } catch (e) {}
+  } catch {}
 }
 
 async function prev() {
   try {
     await fetch("/api/prev", { method: "POST" });
-  } catch (e) {}
+  } catch {}
 }
 </script>
 

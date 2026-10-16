@@ -2,6 +2,24 @@ import { SvelteMap } from "svelte/reactivity";
 import { sync } from "./sync.svelte.ts";
 import { updatePlayerState } from "../modules/player.svelte.ts";
 import { config as globalConfig, updateConfig } from "../config.svelte.ts";
+import type {
+  AlbumCardItem,
+  AlbumDictEntry,
+  CabinetDef,
+  CabinetListItem,
+  DropdownItem,
+  FilterDef,
+  FullAlbum,
+  GrouperDef,
+  GrouperTreeNode,
+  LibraryDef,
+  LibraryListItem,
+  LogicManifest,
+  OrderDef,
+  ShelfDef,
+  ShelfListItem,
+  WsMessage
+} from "../types.ts";
 
 function triggerCoverPrewarm() {
   const sizes = [200, 619];
@@ -20,13 +38,13 @@ function triggerCoverPrewarm() {
 }
 
 class CollectionStore {
-  dict: Record<string, any> = $state({});
-  trackPathMap: Record<string, any> = $state({});
+  dict: Record<string, AlbumDictEntry> = $state({});
+  trackPathMap: Record<string, unknown> = $state({});
   sidebarShelves: Record<string, string[]> = $state({});
   libraryViewIds: string[] = $state([]);
-  sidebarGroups: SvelteMap<string, any[]> = $state(new SvelteMap());
-  fullAlbumCache: Record<string, any> = $state({});
-  manifest: Record<string, any> = $state({
+  sidebarGroups: SvelteMap<string, GrouperTreeNode[]> = $state(new SvelteMap());
+  fullAlbumCache: Record<string, FullAlbum> = $state({});
+  manifest: LogicManifest = $state({
     filters: {},
     libraries: {},
     groupers: {},
@@ -34,19 +52,27 @@ class CollectionStore {
     shelves: {},
     cabinets: {}
   });
-  config: Record<string, any> = $state({});
+  config: Record<string, unknown> = $state({});
 
   constructor() {
-    sync.addEventListener("message", (e: Event) => this.handleMessage((e as CustomEvent).detail));
+    sync.addEventListener("message", (e: Event) =>
+      this.handleMessage((e as CustomEvent<WsMessage>).detail)
+    );
   }
 
-  handleMessage(json: any) {
+  handleMessage(json: WsMessage) {
     if (json.type === "INIT_DICT") {
-      if (json.shelves) this.sidebarShelves = json.shelves;
+      if (json.shelves) {
+        this.sidebarShelves = json.shelves;
+      }
       this.dict = json.dict || {};
       this.trackPathMap = json.trackMap || {};
-      if (json.manifest) this.manifest = json.manifest;
-      if (json.config) this.config = { ...this.config, ...json.config };
+      if (json.manifest) {
+        this.manifest = json.manifest;
+      }
+      if (json.config) {
+        this.config = { ...this.config, ...json.config };
+      }
       triggerCoverPrewarm();
     } else if (json.type === "VIEW_DATA") {
       this.libraryViewIds = json.ids || [];
@@ -55,12 +81,16 @@ class CollectionStore {
       newMap.set(json.key, json.result);
       this.sidebarGroups = newMap;
     } else if (json.type === "ALBUM_REMOVED") {
-      if (json.shelves) this.sidebarShelves = json.shelves;
+      if (json.shelves) {
+        this.sidebarShelves = json.shelves;
+      }
       delete this.dict[json.id];
       delete this.fullAlbumCache[json.id];
       triggerCoverPrewarm();
     } else if (json.type === "ALBUM_UPDATED") {
-      if (json.shelves) this.sidebarShelves = json.shelves;
+      if (json.shelves) {
+        this.sidebarShelves = json.shelves;
+      }
       if (json.old_id && json.old_id !== json.id) {
         delete this.dict[json.old_id];
         delete this.fullAlbumCache[json.old_id];
@@ -73,7 +103,9 @@ class CollectionStore {
       delete this.fullAlbumCache[json.id];
       triggerCoverPrewarm();
     } else if (json.type === "ALBUMS_UPDATED") {
-      if (json.shelves) this.sidebarShelves = json.shelves;
+      if (json.shelves) {
+        this.sidebarShelves = json.shelves;
+      }
       if (json.removed) {
         for (const id of json.removed) {
           if (!json.updated || !json.updated[id]) {
@@ -84,7 +116,7 @@ class CollectionStore {
       }
       if (json.updated) {
         for (const [id, dictEntry] of Object.entries(json.updated)) {
-          if (dictEntry && Object.keys(dictEntry as object).length > 0) {
+          if (dictEntry && Object.keys(dictEntry).length > 0) {
             this.dict[id] = dictEntry;
           } else {
             delete this.dict[id];
@@ -94,7 +126,9 @@ class CollectionStore {
       }
       triggerCoverPrewarm();
     } else if (json.type === "LOGIC_UPDATE") {
-      if (json.manifest) this.manifest = json.manifest;
+      if (json.manifest) {
+        this.manifest = json.manifest;
+      }
     } else if (json.type === "CONFIG_UPDATE") {
       if (json.config) {
         this.config = { ...this.config, ...json.config };
@@ -105,43 +139,50 @@ class CollectionStore {
     }
   }
 
-  mapIdsToAlbums(ids: string[]): any[] {
-    return ids
-      .map((id) => {
-        let a = this.dict[id];
-        return a
-          ? {
-              id: a.id,
-              title: a.album,
-              artist: a.albumartist,
-              cover_hash: a.cover_hash,
-              covers: a.covers,
-              total_discs: a.total_discs,
-              total_tracks: a.total_tracks,
-              duration_formatted: a.duration_formatted,
-              virtual: a.virtual,
-              keys: a.keys,
-              colors: a.colors
-            }
-          : null;
-      })
-      .filter(Boolean);
+  mapIdsToAlbums(ids: string[]): AlbumCardItem[] {
+    const albums: AlbumCardItem[] = [];
+    for (const id of ids) {
+      const a = this.dict[id];
+      if (!a) {
+        continue;
+      }
+      albums.push({
+        id: a.id,
+        title: a.album,
+        artist: a.albumartist,
+        cover_hash: a.cover_hash,
+        covers: a.covers,
+        total_discs: a.total_discs,
+        total_tracks: a.total_tracks,
+        duration_formatted: a.duration_formatted,
+        virtual: a.virtual,
+        keys: a.keys,
+        colors: a.colors
+      });
+    }
+    return albums;
   }
 
-  getThumbnailUrl(album: any): string {
-    if (!album || !album.cover_hash) return "";
+  getThumbnailUrl(album: { cover_hash?: string | null } | null | undefined): string {
+    if (!album || !album.cover_hash) {
+      return "";
+    }
     const algo = globalConfig.album_grid.album_card.cover.filter || "lanczos";
     const size = globalConfig.album_grid.album_card.cover.size || 200;
     return `/api/covers/${album.cover_hash}.bmp?size=${size}&filter=${algo}`;
   }
 
-  async ensureFullAlbum(id: string): Promise<any> {
-    if (!id) return null;
-    if (this.fullAlbumCache[id]) return this.fullAlbumCache[id];
+  async ensureFullAlbum(id: string): Promise<FullAlbum | null> {
+    if (!id) {
+      return null;
+    }
+    if (this.fullAlbumCache[id]) {
+      return this.fullAlbumCache[id];
+    }
     try {
       const res = await fetch(`/api/album/${encodeURIComponent(id)}`);
       if (res.ok) {
-        const data = await res.json();
+        const data = (await res.json()) as FullAlbum;
         data.id = id;
         this.fullAlbumCache[id] = data;
         return data;
@@ -152,41 +193,41 @@ class CollectionStore {
     return null;
   }
 
-  get availableFilters(): Record<string, any> {
+  get availableFilters(): Record<string, FilterDef> {
     return this.manifest.filters || {};
   }
-  get availableLibraries(): Record<string, any> {
+  get availableLibraries(): Record<string, LibraryDef> {
     return this.manifest.libraries || {};
   }
-  get availableGroupers(): Record<string, any> {
+  get availableGroupers(): Record<string, GrouperDef> {
     return this.manifest.groupers || {};
   }
-  get availableOrders(): Record<string, any> {
+  get availableOrders(): Record<string, OrderDef> {
     return this.manifest.orders || {};
   }
-  get availableShelves(): Record<string, any> {
+  get availableShelves(): Record<string, ShelfDef> {
     return this.manifest.shelves || {};
   }
-  get availableCabinets(): Record<string, any> {
+  get availableCabinets(): Record<string, CabinetDef> {
     return this.manifest.cabinets || {};
   }
 
-  get librariesList(): any[] {
+  get librariesList(): LibraryListItem[] {
     const order = this.manifest.libraries_order || Object.keys(this.availableLibraries);
-    return order.map((k: string) => ({ key: k, ...this.availableLibraries[k] }));
+    return order.map((k: string) => ({ key: k, ...(this.availableLibraries[k] || { label: k }) }));
   }
 
-  get shelvesList(): any[] {
+  get shelvesList(): ShelfListItem[] {
     const order = this.manifest.shelves_order || Object.keys(this.availableShelves);
-    return order.map((k: string) => ({ key: k, ...this.availableShelves[k] }));
+    return order.map((k: string) => ({ key: k, ...(this.availableShelves[k] || { label: k }) }));
   }
 
-  get cabinetsList(): any[] {
+  get cabinetsList(): CabinetListItem[] {
     const order = this.manifest.cabinets_order || Object.keys(this.availableCabinets);
-    return order.map((k: string) => ({ key: k, ...this.availableCabinets[k] }));
+    return order.map((k: string) => ({ key: k, ...(this.availableCabinets[k] || { label: k }) }));
   }
 
-  getVisibleFilters(activeLibrary: string): any[] {
+  getVisibleFilters(activeLibrary: string): DropdownItem[] {
     const library = this.availableLibraries[activeLibrary];
     const order = this.manifest.filters_order || Object.keys(this.availableFilters);
     if (library && library.allowed_filters) {
@@ -199,7 +240,7 @@ class CollectionStore {
       .map((k: string) => ({ key: k, label: this.availableFilters[k].label || k }));
   }
 
-  getVisibleGroupers(activeLibrary: string): any[] {
+  getVisibleGroupers(activeLibrary: string): DropdownItem[] {
     const library = this.availableLibraries[activeLibrary];
     const order = this.manifest.groupers_order || Object.keys(this.availableGroupers);
     if (library && library.allowed_groupers) {
@@ -212,7 +253,7 @@ class CollectionStore {
       .map((k: string) => ({ key: k, label: this.availableGroupers[k].label || k }));
   }
 
-  getVisibleOrders(activeLibrary: string): any[] {
+  getVisibleOrders(activeLibrary: string): DropdownItem[] {
     const library = this.availableLibraries[activeLibrary];
     const order = this.manifest.orders_order || Object.keys(this.availableOrders);
     if (library && library.allowed_orders) {
@@ -225,7 +266,7 @@ class CollectionStore {
       .map((k: string) => ({ key: k, label: this.availableOrders[k].label || k }));
   }
 
-  getVisibleShelvesForCabinet(activeCabinet: string): any[] {
+  getVisibleShelvesForCabinet(activeCabinet: string): DropdownItem[] {
     const cabinet = this.availableCabinets[activeCabinet];
     const order = this.manifest.shelves_order || Object.keys(this.availableShelves);
     if (cabinet && cabinet.allowed_shelves && cabinet.allowed_shelves.length > 0) {
@@ -238,7 +279,7 @@ class CollectionStore {
       .map((k: string) => ({ key: k, label: this.availableShelves[k].label || k }));
   }
 
-  getVisibleOrdersForCabinet(activeCabinet: string): any[] {
+  getVisibleOrdersForCabinet(activeCabinet: string): DropdownItem[] {
     const cabinet = this.availableCabinets[activeCabinet];
     if (!cabinet || !cabinet.allowed_orders || cabinet.allowed_orders.length === 0) {
       return [];

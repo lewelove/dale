@@ -1,7 +1,14 @@
 <script lang="ts">
 import { fade } from "svelte/transition";
+import type { GrouperTreeNode } from "../../types.ts";
 
-let { items = [], container = null }: { items?: any[]; container?: HTMLElement | null } = $props();
+let {
+  items = [],
+  container = null
+}: {
+  items?: GrouperTreeNode[];
+  container?: HTMLElement | null;
+} = $props();
 
 let indexContainer: HTMLDivElement | null = $state(null);
 let charsWrapper: HTMLDivElement | null = $state(null);
@@ -11,14 +18,20 @@ let activeEntryIndex = $state(-1);
 let bubbleY = $state(0);
 
 function getBucketChar(label: string) {
-  if (!label) return "?";
+  if (!label) {
+    return "?";
+  }
   const normalized = label
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "")
     .toUpperCase();
   const char = normalized.charAt(0);
-  if (/[A-Z]/.test(char)) return char;
-  if (/[0-9]/.test(char)) return "#";
+  if (/[A-Z]/.test(char)) {
+    return char;
+  }
+  if (/[0-9]/.test(char)) {
+    return "#";
+  }
   return "?";
 }
 
@@ -36,7 +49,9 @@ let indexEntries = $derived.by(() => {
 });
 
 function calculateScrub(e: PointerEvent) {
-  if (!charsWrapper || !indexContainer || indexEntries.length === 0) return;
+  if (!charsWrapper || !indexContainer || indexEntries.length === 0) {
+    return;
+  }
 
   const wrapperRect = charsWrapper.getBoundingClientRect();
   const containerRect = indexContainer.getBoundingClientRect();
@@ -64,14 +79,18 @@ function calculateScrub(e: PointerEvent) {
 }
 
 function onPointerDown(e: PointerEvent) {
-  if (e.button !== 0) return;
+  if (e.button !== 0) {
+    return;
+  }
   isScrubbing = true;
   indexContainer?.setPointerCapture(e.pointerId);
   calculateScrub(e);
 }
 
 function onPointerMove(e: PointerEvent) {
-  if (isScrubbing) calculateScrub(e);
+  if (isScrubbing) {
+    calculateScrub(e);
+  }
 }
 
 function onPointerUp(e: PointerEvent) {

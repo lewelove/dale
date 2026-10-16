@@ -50,11 +50,19 @@ let isPlaying = $derived(player.state === "play");
 let moduleWidth = $state(0);
 
 $effect(() => {
-  const uniqueIds = [...new Set(player.queue.map((item) => item.album_id).filter(Boolean))];
+  const uniqueIds = [
+    ...new Set(
+      player.queue
+        .map((item) => item.album_id)
+        .filter((id): id is string => Boolean(id))
+    )
+  ];
   if (activeId && !uniqueIds.includes(activeId)) {
     uniqueIds.push(activeId);
   }
-  uniqueIds.forEach((id) => collection.ensureFullAlbum(id));
+  uniqueIds.forEach((id) => {
+    collection.ensureFullAlbum(id);
+  });
 });
 </script>
 

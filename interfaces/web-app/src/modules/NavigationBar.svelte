@@ -2,12 +2,12 @@
 import { nav, setTab } from "../navigation.svelte.ts";
 import { executeAction } from "../api.ts";
 
-let { variant = "solid" } = $props();
+let { variant = "solid" }: { variant?: "solid" | "transparent" } = $props();
 
 async function handleOpenConfig() {
   try {
     await executeAction("open_config_in_terminal", "");
-  } catch (err) {}
+  } catch {}
 }
 </script>
 

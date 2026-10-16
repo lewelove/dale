@@ -3,6 +3,7 @@ import { SvelteSet } from "svelte/reactivity";
 import { view } from "../../library/view.svelte.ts";
 import { collection } from "../../library/collection.svelte.ts";
 import SidebarIndex from "./SidebarIndex.svelte";
+import type { GrouperTreeNode } from "../../types.ts";
 
 let isLibraryMenuOpen = $state(false);
 let isLibraryFilterMenuOpen = $state(false);
@@ -11,7 +12,7 @@ let isGroupMenuOpen = $state(false);
 let isCabinetMenuOpen = $state(false);
 let isCabinetOrderMenuOpen = $state(false);
 let scrollContainer: HTMLDivElement | null = $state(null);
-let expandedNodes = new SvelteSet<string>();
+const expandedNodes = new SvelteSet<string>();
 
 let isCabinetsMode = $derived(view.homeSubView === "cabinets");
 
@@ -65,9 +66,9 @@ let items = $derived(view.getSidebarGroup(view.activeSidebarGrouper));
 let isReverse = $derived(view.userSortOrder === "reverse");
 
 let activeGrouperDef = $derived(
-  view.activeSidebarGrouper ? collection.availableGroupers[view.activeSidebarGrouper] || {} : {}
+  view.activeSidebarGrouper ? collection.availableGroupers[view.activeSidebarGrouper] : undefined
 );
-let showIndex = $derived(activeGrouperDef.index === true);
+let showIndex = $derived(activeGrouperDef?.index === true);
 
 function toggleSubView() {
   view.homeSubView = view.homeSubView === "libraries" ? "cabinets" : "libraries";
@@ -123,7 +124,7 @@ function toggleExpand(value: string) {
 }
 </script>
 
-{#snippet TreeNode(item: any, idPrefix: string, depth: number)}
+{#snippet TreeNode(item: GrouperTreeNode, idPrefix: string, depth: number)}
   {@const hasChildren = Boolean(item.children && item.children.length > 0)}
   {@const isExpanded = expandedNodes.has(item.value)}
   {@const activeGrouper = view.activeSidebarGrouper}

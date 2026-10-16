@@ -9,6 +9,7 @@
     "sourceMap": true,
     "esModuleInterop": true,
     "strict": true,
+    "noImplicitAny": true,
     "allowJs": true,
     "checkJs": false,
     "skipLibCheck": true,

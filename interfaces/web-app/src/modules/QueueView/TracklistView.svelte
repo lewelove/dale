@@ -1,17 +1,20 @@
 <script lang="ts">
 import { jumpToQueueIndex } from "../../api.ts";
+import type { AlbumDictEntry, MappedQueueTrack } from "../../types.ts";
 
 let {
   tracks = [],
   albumMeta = null
 }: {
-  tracks?: any[];
-  albumMeta?: any;
+  tracks?: MappedQueueTrack[];
+  albumMeta?: AlbumDictEntry | null;
 } = $props();
 
 function formatDuration(str: string) {
-  if (!str) return "0:00";
-  let parts = str.split(":");
+  if (!str) {
+    return "0:00";
+  }
+  const parts = str.split(":");
   while (parts.length > 2 && parseInt(parts[0]) === 0) {
     parts.shift();
   }
@@ -22,17 +25,21 @@ function formatDuration(str: string) {
 }
 
 function formatMs(ms: number) {
-  if (!ms) return "0:00";
+  if (!ms) {
+    return "0:00";
+  }
   const totalSeconds = Math.floor(ms / 1000);
   const h = Math.floor(totalSeconds / 3600);
   const m = Math.floor((totalSeconds % 3600) / 60);
   const s = totalSeconds % 60;
   const pad = (num: number) => String(num).padStart(2, "0");
-  if (h > 0) return `${h}:${pad(m)}:${pad(s)}`;
+  if (h > 0) {
+    return `${h}:${pad(m)}:${pad(s)}`;
+  }
   return `${m}:${pad(s)}`;
 }
 
-function getDiscDuration(discTracks: any[], discNumber: number) {
+function getDiscDuration(discTracks: MappedQueueTrack[], discNumber: number) {
   const totalMs = discTracks
     .filter((t) => t.discNo === discNumber)
     .reduce((acc, t) => acc + t.durationMs, 0);
@@ -42,7 +49,7 @@ function getDiscDuration(discTracks: any[], discNumber: number) {
 async function handleJump(id: string | number) {
   try {
     await jumpToQueueIndex(id);
-  } catch (e) {}
+  } catch {}
 }
 
 let isMultiDiscAlbum = $derived(
@@ -80,12 +87,12 @@ let isMultiDiscAlbum = $derived(
       tabindex="0"
     >
       <div class="v-track-body">
-        <span class="v-truncate v-track-title">{track.title}</span>
-        {#if track.artist && albumMeta && track.artist.toLowerCase() !== albumMeta.albumartist.toLowerCase()}
-          <span class="v-truncate v-track-artist">{track.artist}</span>
+        <span class="v-truncate v-track-title track-title">{track.title}</span>
+        {#if track.artist && albumMeta && track.artist.toLowerCase() !== albumMeta.albumartist?.toLowerCase()}
+          <span class="v-truncate v-track-artist track-artist">{track.artist}</span>
         {/if}
       </div>
-      <span class="v-mono v-track-meta">
+      <span class="v-mono v-track-meta track-meta">
         {formatDuration(track.duration)}
       </span>
     </div>
@@ -145,7 +152,6 @@ let isMultiDiscAlbum = $derived(
 .track-row {
   margin: 0;
   padding-left: 14px;
-  /* padding-right: 14px; */
   transition: none !important;
 }
 

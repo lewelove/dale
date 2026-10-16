@@ -1,12 +1,13 @@
 <script lang="ts">
-import { fade } from "svelte/transition";
+import { fade, type FadeParams } from "svelte/transition";
 import { cubicOut } from "svelte/easing";
 import { view } from "../../../library/view.svelte.ts";
 import { playAlbum, playDisc, executeAction, updateAlbum } from "../../../api.ts";
 import ClearCover from "../../ClearCover.svelte";
 import ModalDrawerTracks from "./ModalDrawerTracks.svelte";
+import type { FullAlbum } from "../../../types.ts";
 
-let { album, onclose }: { album: any; onclose: () => void } = $props();
+let { album, onclose }: { album: FullAlbum; onclose: () => void } = $props();
 
 let windowWidth = $state(typeof window !== "undefined" ? window.innerWidth : 1280);
 let leftColumnWidth = $derived(Math.round(0.36 * windowWidth));
@@ -42,7 +43,7 @@ $effect(() => {
   });
 });
 
-function fadeIf(node: Element, params: any) {
+function fadeIf(node: Element, params: FadeParams) {
   if (view.isFocusInstant) {
     return { duration: 0, css: () => "" };
   }
@@ -52,35 +53,39 @@ function fadeIf(node: Element, params: any) {
 async function handlePlay() {
   try {
     await playAlbum(album.id);
-  } catch (err) {}
+  } catch {}
 }
 
 async function handleUpdate() {
   try {
     await updateAlbum(album.id);
-  } catch (err) {}
+  } catch {}
 }
 
 async function handlePlayTrack(index: number) {
   try {
-    const track = album.tracks[index];
+    const tracks = album.tracks || [];
+    const track = tracks[index];
+    if (!track) {
+      return;
+    }
     const discNumber = track.discnumber;
 
     let intraDiscOffset = 0;
     for (let i = 0; i < index; i++) {
-      if (album.tracks[i].discnumber === discNumber) {
+      if (tracks[i].discnumber === discNumber) {
         intraDiscOffset++;
       }
     }
 
     await playDisc(album.id, discNumber, intraDiscOffset);
-  } catch (err) {}
+  } catch {}
 }
 
 async function handlePlayDisc(discNumber: number) {
   try {
     await playDisc(album.id, discNumber);
-  } catch (err) {}
+  } catch {}
 }
 
 function handleBackdropClick(e: MouseEvent) {
@@ -351,4 +356,3 @@ function handleBackdropClick(e: MouseEvent) {
   width: 0;
 }
 </style>
-

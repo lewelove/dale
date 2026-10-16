@@ -1,45 +1,51 @@
 import appConfig from "../config.json";
 
-export const config = $state(structuredClone(appConfig));
+export type AppConfig = typeof appConfig;
 
-export function updateConfig(newData: any) {
-  if (!newData) return;
+export const config = $state<AppConfig>(structuredClone(appConfig));
 
-  if (newData.shader) {
-    Object.assign(config.shader, newData.shader);
+export function updateConfig(newData: Record<string, unknown> | null | undefined) {
+  if (!newData) {
+    return;
   }
 
-  if (newData.album_grid) {
-    if (newData.album_grid.spacing) {
-      Object.assign(config.album_grid.spacing, newData.album_grid.spacing);
+  const shader = newData.shader as Partial<AppConfig["shader"]> | undefined;
+  if (shader) {
+    Object.assign(config.shader, shader);
+  }
+
+  const grid = newData.album_grid as Partial<AppConfig["album_grid"]> | undefined;
+  if (grid) {
+    if (grid.spacing) {
+      Object.assign(config.album_grid.spacing, grid.spacing);
     }
 
-    if (newData.album_grid.album_card) {
-      if (newData.album_grid.album_card.cover) {
-        Object.assign(config.album_grid.album_card.cover, newData.album_grid.album_card.cover);
+    if (grid.album_card) {
+      if (grid.album_card.cover) {
+        Object.assign(config.album_grid.album_card.cover, grid.album_card.cover);
       }
 
-      if (newData.album_grid.album_card.text) {
-        if (newData.album_grid.album_card.text.title) {
+      if (grid.album_card.text) {
+        if (grid.album_card.text.title) {
           Object.assign(
             config.album_grid.album_card.text.title,
-            newData.album_grid.album_card.text.title
+            grid.album_card.text.title
           );
         }
-        if (newData.album_grid.album_card.text.albumartist) {
+        if (grid.album_card.text.albumartist) {
           Object.assign(
             config.album_grid.album_card.text.albumartist,
-            newData.album_grid.album_card.text.albumartist
+            grid.album_card.text.albumartist
           );
         }
-        if (newData.album_grid.album_card.text.spacing) {
+        if (grid.album_card.text.spacing) {
           Object.assign(
             config.album_grid.album_card.text.spacing,
-            newData.album_grid.album_card.text.spacing
+            grid.album_card.text.spacing
           );
         }
-        if (newData.album_grid.album_card.text.enable !== undefined) {
-          config.album_grid.album_card.text.enable = newData.album_grid.album_card.text.enable;
+        if (grid.album_card.text.enable !== undefined) {
+          config.album_grid.album_card.text.enable = grid.album_card.text.enable;
         }
       }
     }
@@ -47,9 +53,10 @@ export function updateConfig(newData: any) {
 }
 
 if (import.meta.hot) {
-  import.meta.hot.accept("../config.json", (mod: any) => {
+  import.meta.hot.accept("../config.json", (mod) => {
     if (mod) {
-      updateConfig(mod.default ?? mod);
+      const nextConfig = ("default" in mod ? mod.default : mod) as Record<string, unknown>;
+      updateConfig(nextConfig);
     }
   });
 }

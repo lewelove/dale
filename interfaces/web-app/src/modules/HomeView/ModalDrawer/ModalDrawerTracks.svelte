@@ -1,4 +1,6 @@
 <script lang="ts">
+import type { TrackItem } from "../../../types.ts";
+
 let {
   tracks = [],
   totalDiscs = 1,
@@ -6,7 +8,7 @@ let {
   onplay,
   onplaydisc
 }: {
-  tracks?: any[];
+  tracks?: TrackItem[];
   totalDiscs?: string | number;
   albumArtist?: string;
   onplay?: (index: number) => void;
@@ -15,10 +17,12 @@ let {
 
 let multiDisc = $derived(Number(totalDiscs) > 1);
 
-function formatDuration(str: string) {
-  if (!str) return "0:00";
+function formatDuration(str?: string) {
+  if (!str) {
+    return "0:00";
+  }
 
-  let parts = str.split(":");
+  const parts = str.split(":");
 
   while (parts.length > 2 && parseInt(parts[0]) === 0) {
     parts.shift();
@@ -32,7 +36,9 @@ function formatDuration(str: string) {
 }
 
 function formatMs(ms: number) {
-  if (!ms) return "0:00";
+  if (!ms) {
+    return "0:00";
+  }
   const totalSeconds = Math.floor(ms / 1000);
   const h = Math.floor(totalSeconds / 3600);
   const m = Math.floor((totalSeconds % 3600) / 60);
@@ -49,12 +55,14 @@ function formatMs(ms: number) {
 function getDiscDuration(discNumber: number) {
   const totalMs = tracks
     .filter((t) => t.discnumber === discNumber)
-    .reduce((acc, t) => acc + (parseInt(t.info?.duration_milliseconds) || 0), 0);
+    .reduce((acc, t) => acc + (Number(t.info?.duration_milliseconds) || 0), 0);
   return formatMs(totalMs);
 }
 
 function handlePlay(index: number) {
-  if (onplay) onplay(index);
+  if (onplay) {
+    onplay(index);
+  }
 }
 
 function handlePlayDisc(discNumber: number) {

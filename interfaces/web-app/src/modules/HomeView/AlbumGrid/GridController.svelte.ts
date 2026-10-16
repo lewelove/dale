@@ -1,12 +1,13 @@
 import { LayoutManager } from "./Layout.svelte.ts";
 import { ScrollEngine } from "./Scroll.svelte.ts";
+import type { AlbumCardItem } from "../../../types.ts";
 
 export class GridController {
   layout = new LayoutManager();
   scroll = new ScrollEngine();
   viewportHeight: number = $state(0);
 
-  albums: any[] = $state([]);
+  albums: AlbumCardItem[] = $state([]);
 
   allRows = $derived(this.layout.chunk(this.albums));
 
@@ -15,7 +16,9 @@ export class GridController {
   maxSlots = $derived(Math.max(0, this.allRows.length + 1 - this.visibleRows));
 
   virtualRows = $derived.by(() => {
-    if (this.allRows.length === 0) return [];
+    if (this.allRows.length === 0) {
+      return [];
+    }
 
     const { start, end } = this.layout.getVisibleIndices(
       this.scroll.currentY,
