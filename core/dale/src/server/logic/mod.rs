@@ -9,7 +9,8 @@ use libdale::error::DaleError;
 use libdale::images::{FilterType, FitMode, parse_filter, parse_fit_mode};
 use libdale::lua::{LogicManifest, with_evaluated_lua_vm};
 use roaring::RoaringBitmap;
-use serde_json::{Value, json};
+use serde::Serialize;
+use serde_json::{Value, json, value::RawValue};
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
@@ -28,13 +29,34 @@ pub struct CoverLookupItem {
 pub struct AlbumRecord {
     pub id: String,
     pub path: PathBuf,
+    pub title: String,
+    pub artist: String,
+    pub cover_path: String,
     pub raw_json: Arc<str>,
-    pub dict_entry: Arc<Value>,
+    pub dict_raw: Box<RawValue>,
     pub total_discs: u64,
     pub total_tracks: u64,
     pub duration_ms: u64,
     pub track_uris: Vec<String>,
-    pub cover_addresses: Vec<String>,
+    pub cover_namespaces: Vec<(String, String)>,
+}
+
+#[derive(Clone, Debug, Serialize)]
+pub struct TrackLookupItem {
+    pub path: String,
+    #[serde(rename = "trackIndex")]
+    pub track_index: usize,
+    #[serde(rename = "trackNo")]
+    pub track_no: u32,
+    #[serde(rename = "discNo")]
+    pub disc_no: u32,
+    pub title: String,
+    pub artist: String,
+    pub duration: String,
+    #[serde(rename = "durationMs")]
+    pub duration_ms: u64,
+    #[serde(rename = "albumId")]
+    pub album_id: String,
 }
 
 pub struct LogicEngine {
@@ -50,8 +72,7 @@ pub struct LogicEngine {
     pub id_to_uid: HashMap<String, u32>,
     pub path_to_uid: HashMap<PathBuf, u32>,
     pub cover_lookup: HashMap<String, CoverLookupItem>,
-    pub track_lookup: HashMap<String, Value>,
-    pub path_lookup: HashMap<String, String>,
+    pub track_lookup: HashMap<String, TrackLookupItem>,
     pub(crate) evaluated_logic: HashMap<u32, Value>,
 }
 
@@ -74,7 +95,6 @@ impl LogicEngine {
             path_to_uid: HashMap::new(),
             cover_lookup: HashMap::new(),
             track_lookup: HashMap::new(),
-            path_lookup: HashMap::new(),
             evaluated_logic: HashMap::new(),
         })
     }
@@ -110,7 +130,6 @@ impl LogicEngine {
         self.cover_lookup.clear();
         self.next_uid = 1;
         self.track_lookup.clear();
-        self.path_lookup.clear();
         self.evaluated_logic.clear();
     }
 
@@ -133,11 +152,10 @@ impl LogicEngine {
             self.path_to_uid.remove(&record.path);
 
             for uri in &record.track_uris {
-                self.path_lookup.remove(uri);
                 self.track_lookup.remove(uri);
             }
 
-            for addr in &record.cover_addresses {
+            for (_, addr) in &record.cover_namespaces {
                 self.cover_lookup.remove(addr);
             }
         }
@@ -206,41 +224,53 @@ impl LogicEngine {
             );
             let mpd_uri = mpd_uri_raw.trim_start_matches('/').to_string();
 
-            let track_no = track
-                .get("tracknumber")
-                .cloned()
-                .unwrap_or_else(|| json!(0));
-            let disc_no = track.get("discnumber").cloned().unwrap_or_else(|| json!(1));
+            let track_no = match track.get("tracknumber") {
+                Some(Value::Number(n)) => {
+                    n.as_u64().and_then(|v| u32::try_from(v).ok()).unwrap_or(0)
+                }
+                Some(Value::String(s)) => s.parse().unwrap_or(0),
+                _ => 0,
+            };
+            let disc_no = match track.get("discnumber") {
+                Some(Value::Number(n)) => {
+                    n.as_u64().and_then(|v| u32::try_from(v).ok()).unwrap_or(1)
+                }
+                Some(Value::String(s)) => s.parse().unwrap_or(1),
+                _ => 1,
+            };
             let title = track
                 .get("title")
-                .cloned()
-                .unwrap_or_else(|| json!("Unknown"));
+                .and_then(Value::as_str)
+                .unwrap_or("Unknown")
+                .to_string();
             let artist = track
                 .get("artist")
-                .cloned()
-                .unwrap_or_else(|| json!("Unknown"));
+                .and_then(Value::as_str)
+                .unwrap_or("Unknown")
+                .to_string();
             let duration = tinfo
                 .get("duration_formatted")
-                .cloned()
-                .unwrap_or_else(|| json!("0:00"));
+                .and_then(Value::as_str)
+                .unwrap_or("0:00")
+                .to_string();
             let duration_ms = tinfo
                 .get("duration_milliseconds")
                 .and_then(Value::as_u64)
                 .unwrap_or(0);
 
-            let track_light = json!({
-                "path": mpd_uri,
-                "trackIndex": track_idx,
-                "trackNo": track_no,
-                "discNo": disc_no,
-                "title": title,
-                "artist": artist,
-                "duration": duration,
-                "durationMs": duration_ms,
-                "albumId": id
-            });
-            self.track_lookup.insert(mpd_uri.clone(), track_light);
-            self.path_lookup.insert(mpd_uri.clone(), id.to_string());
+            let track_item = TrackLookupItem {
+                path: mpd_uri.clone(),
+                track_index: track_idx,
+                track_no,
+                disc_no,
+                title,
+                artist,
+                duration,
+                duration_ms,
+                album_id: id.to_string(),
+            };
+
+            self.track_lookup.insert(mpd_uri.clone(), track_item);
             track_uris.push(mpd_uri);
         }
 
@@ -251,8 +281,8 @@ impl LogicEngine {
         &mut self,
         album: &Value,
         album_dir_canon: &Path,
-    ) -> (Option<Value>, Option<Value>, Vec<String>) {
-        let mut cover_addresses = Vec::new();
+    ) -> (Option<Value>, Option<Value>, Vec<(String, String)>) {
+        let mut cover_namespaces = Vec::new();
         let main_cover = album
             .get("covers")
             .and_then(|c| c.get("main"))
@@ -265,11 +295,14 @@ impl LogicEngine {
         let cover_hash_val = main_cover.and_then(|m| m.get("address")).cloned();
 
         let Some(covers) = album.get("covers").and_then(Value::as_object) else {
-            return (cover_path_val, cover_hash_val, cover_addresses);
+            return (cover_path_val, cover_hash_val, cover_namespaces);
         };
 
-        for entries in covers.values().filter_map(Value::as_array) {
-            for entry in entries {
+        for (ns, entries) in covers {
+            let Some(entries_arr) = entries.as_array() else {
+                continue;
+            };
+            for entry in entries_arr {
                 let Some(addr) = entry.get("address").and_then(Value::as_str) else {
                     continue;
                 };
@@ -309,11 +342,11 @@ impl LogicEngine {
                         filter,
                     },
                 );
-                cover_addresses.push(addr.to_string());
+                cover_namespaces.push((ns.clone(), addr.to_string()));
             }
         }
 
-        (cover_path_val, cover_hash_val, cover_addresses)
+        (cover_path_val, cover_hash_val, cover_namespaces)
     }
 
     pub fn ingest_pre_evaluated(
@@ -363,8 +396,26 @@ impl LogicEngine {
             },
         );
 
-        let (cover_path_val, cover_hash_val, cover_addresses) =
+        let (cover_path_val, cover_hash_val, cover_namespaces) =
             self.ingest_covers(album, &album_dir_canon);
+
+        let cover_path = cover_path_val
+            .as_ref()
+            .and_then(Value::as_str)
+            .unwrap_or("cover.jpg")
+            .to_string();
+
+        let title = album
+            .get("album")
+            .and_then(Value::as_str)
+            .unwrap_or("Unknown")
+            .to_string();
+
+        let artist = album
+            .get("albumartist")
+            .and_then(Value::as_str)
+            .unwrap_or("Unknown")
+            .to_string();
 
         let entry = json!({
             "id": id,
@@ -382,16 +433,22 @@ impl LogicEngine {
             "colors": album.get("colors")
         });
 
+        let dict_str = serde_json::to_string(&entry)?;
+        let dict_raw = RawValue::from_string(dict_str)?;
+
         let record = AlbumRecord {
             id: id.to_string(),
             path: album_dir_canon.clone(),
+            title,
+            artist,
+            cover_path,
             raw_json: Arc::from(metadata_json),
-            dict_entry: Arc::new(entry),
+            dict_raw,
             total_discs,
             total_tracks,
             duration_ms,
             track_uris,
-            cover_addresses,
+            cover_namespaces,
         };
 
         self.albums.insert(uid, record);
@@ -421,15 +478,15 @@ impl LogicEngine {
     }
 
     #[must_use]
-    pub fn get_album_dict(&self, id: &str) -> Option<Arc<Value>> {
-        self.get_album_record(id).map(|r| Arc::clone(&r.dict_entry))
+    pub fn get_album_dict(&self, id: &str) -> Option<&RawValue> {
+        self.get_album_record(id).map(|r| &*r.dict_raw)
     }
 
     #[must_use]
-    pub fn dict_snapshot(&self) -> HashMap<String, Value> {
+    pub fn dict_snapshot(&self) -> HashMap<String, Box<RawValue>> {
         self.albums
             .values()
-            .map(|a| (a.id.clone(), (*a.dict_entry).clone()))
+            .map(|a| (a.id.clone(), a.dict_raw.clone()))
             .collect()
     }
 

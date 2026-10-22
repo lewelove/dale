@@ -24,13 +24,13 @@ pub type RecompiledAlbumItem = (
 #[derive(Default)]
 struct IngestOutcome {
     removed_ids: Vec<String>,
-    updated_dict_entries: HashMap<String, serde_json::Value>,
+    updated_dict_entries: HashMap<String, Box<serde_json::value::RawValue>>,
     deps_modified: bool,
 }
 
-pub(super) fn filter_reingested_ids<S: std::hash::BuildHasher>(
+pub(super) fn filter_reingested_ids<V, S: std::hash::BuildHasher>(
     removed_ids: &mut Vec<String>,
-    updated_entries: &HashMap<String, serde_json::Value, S>,
+    updated_entries: &HashMap<String, V, S>,
 ) {
     if removed_ids.is_empty() || updated_entries.is_empty() {
         return;
@@ -287,7 +287,7 @@ fn ingest_recompiled_items(
                     if let Some(entry) = logic.get_album_dict(&album_id) {
                         outcome
                             .updated_dict_entries
-                            .insert(album_id, (*entry).clone());
+                            .insert(album_id, entry.to_owned());
                     }
                 }
                 Err(e) => {

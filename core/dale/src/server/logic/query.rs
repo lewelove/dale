@@ -28,18 +28,8 @@ impl LogicEngine {
                 let mut searched = RoaringBitmap::new();
                 for uid in &final_mask {
                     if let Some(record) = self.albums.get(&uid) {
-                        let title = record
-                            .dict_entry
-                            .get("album")
-                            .and_then(Value::as_str)
-                            .unwrap_or("")
-                            .to_lowercase();
-                        let artist = record
-                            .dict_entry
-                            .get("albumartist")
-                            .and_then(Value::as_str)
-                            .unwrap_or("")
-                            .to_lowercase();
+                        let title = record.title.to_lowercase();
+                        let artist = record.artist.to_lowercase();
                         if title.contains(&needle) || artist.contains(&needle) {
                             searched.insert(uid);
                         }
@@ -158,21 +148,9 @@ impl LogicEngine {
         self.albums
             .values()
             .filter_map(|record| {
-                let title = record
-                    .dict_entry
-                    .get("album")
-                    .and_then(Value::as_str)
-                    .unwrap_or("")
-                    .to_lowercase();
-                let artist = record
-                    .dict_entry
-                    .get("albumartist")
-                    .and_then(Value::as_str)
-                    .unwrap_or("")
-                    .to_lowercase();
                 if record.id.to_lowercase().contains(&needle)
-                    || title.contains(&needle)
-                    || artist.contains(&needle)
+                    || record.title.to_lowercase().contains(&needle)
+                    || record.artist.to_lowercase().contains(&needle)
                 {
                     return Some(record.id.clone());
                 }

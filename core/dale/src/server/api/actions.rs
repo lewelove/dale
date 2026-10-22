@@ -18,12 +18,12 @@ async fn resolve_playing_target(state: &AppState) -> Option<String> {
     let clean_playing = playing_path.trim_start_matches('/');
     let logic = state.logic.read().await;
 
-    if let Some(id) = logic
-        .path_lookup
+    if let Some(item) = logic
+        .track_lookup
         .get(clean_playing)
-        .or_else(|| logic.path_lookup.get(&playing_path))
+        .or_else(|| logic.track_lookup.get(&playing_path))
     {
-        return Some(id.clone());
+        return Some(item.album_id.clone());
     }
 
     let music_dir = state.config.read().await.music_directory.clone();

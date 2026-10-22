@@ -9,7 +9,7 @@ use libdale::images::{
     resize_image_max_edge,
 };
 use serde::Deserialize;
-use serde_json::{Value, json};
+use serde_json::json;
 use std::collections::HashSet;
 use std::path::{Path as StdPath, PathBuf};
 use std::sync::Arc;
@@ -357,35 +357,20 @@ fn collect_matching_addresses(
         names.map(|arr| arr.iter().map(String::as_str).collect());
 
     for record in logic.albums.values() {
-        let Some(covers) = record.dict_entry.get("covers").and_then(Value::as_object)
-        else {
-            continue;
-        };
-
-        for (ns, entries) in covers {
+        for (ns, addr) in &record.cover_namespaces {
             if let Some(ref nf) = name_filter
                 && !nf.contains(ns.as_str())
             {
                 continue;
             }
 
-            let Some(entries_arr) = entries.as_array() else {
+            if let Some(ref af) = addr_filter
+                && !af.contains(addr.as_str())
+            {
                 continue;
-            };
-
-            for entry in entries_arr {
-                let Some(addr) = entry.get("address").and_then(Value::as_str) else {
-                    continue;
-                };
-
-                if let Some(ref af) = addr_filter
-                    && !af.contains(addr)
-                {
-                    continue;
-                }
-
-                matched.insert(addr.to_string());
             }
+
+            matched.insert(addr.clone());
         }
     }
 
@@ -579,17 +564,12 @@ pub async fn get_album_cover(
 ) -> Response {
     let path_opt = {
         let logic = state.logic.read().await;
-        let album_dir = logic.get_album_path(&id).map(StdPath::to_path_buf);
-        logic.get_album_record(&id).and_then(|record| {
-            let cp = record
-                .dict_entry
-                .get("cover_path")
-                .and_then(|v| v.as_str())
-                .unwrap_or("cover.jpg");
+        logic.get_album_record(&id).map(|record| {
+            let cp = &record.cover_path;
             if std::path::Path::new(cp).is_absolute() {
-                Some(PathBuf::from(cp))
+                PathBuf::from(cp)
             } else {
-                album_dir.map(|dir| dir.join(cp))
+                record.path.join(cp)
             }
         })
     };

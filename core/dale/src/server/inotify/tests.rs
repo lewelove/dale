@@ -41,7 +41,7 @@ fn test_filter_retains_unmatched_id() {
 #[test]
 fn test_filter_noop_on_empty_inputs() {
     let mut removed_ids = Vec::new();
-    let updated_entries = HashMap::new();
+    let updated_entries: HashMap<String, serde_json::Value> = HashMap::new();
 
     filter_reingested_ids(&mut removed_ids, &updated_entries);
 
