@@ -114,15 +114,19 @@ impl LogicEngine {
         library_filter: Option<&str>,
         grouper: &str,
     ) -> Vec<Value> {
-        let key = (
-            library.to_string(),
-            library_filter.map(ToString::to_string),
-            grouper.to_string(),
-        );
-        self.precomputed_groups
-            .get(&key)
-            .cloned()
-            .unwrap_or_default()
+        let view_mask = self.resolve_view_mask(library, library_filter);
+        if view_mask.is_empty() {
+            return Vec::new();
+        }
+
+        let lua_engine = libdale::lua::LuaEngine::new().ok();
+        if let Some(ref engine) = lua_engine
+            && self.config_path.exists()
+        {
+            let _ = engine.evaluate_config(&self.config_path);
+        }
+
+        self.build_grouper_items(lua_engine.as_ref(), grouper, &view_mask)
     }
 
     pub fn find_ids(&self, query_str: &str) -> Vec<String> {

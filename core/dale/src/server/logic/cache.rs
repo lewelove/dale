@@ -282,7 +282,6 @@ impl LogicEngine {
         self.libraries_cache.clear();
         self.filters_cache.clear();
         self.groupers_cache.clear();
-        self.precomputed_groups.clear();
         self.orders_cache.clear();
         self.shelves_cache.clear();
 
@@ -414,40 +413,35 @@ impl LogicEngine {
         }
     }
 
-    fn collect_library_views(&self) -> Vec<(String, Option<String>, RoaringBitmap)> {
-        let mut views = Vec::new();
+    pub(crate) fn resolve_view_mask(
+        &self,
+        library: &str,
+        filter: Option<&str>,
+    ) -> RoaringBitmap {
         let empty_bitmap = RoaringBitmap::new();
-
-        if self.manifest.libraries.is_empty() {
+        let library_mask = if self.manifest.libraries.is_empty() && library == "library" {
             let mut all_uids = RoaringBitmap::new();
             for &uid in self.albums.keys() {
                 all_uids.insert(uid);
             }
-            views.push(("library".to_string(), None, all_uids));
+            all_uids
         } else {
-            for (lib_id, lib_def) in &self.manifest.libraries {
-                let lib_mask = self.libraries_cache.get(lib_id).unwrap_or(&empty_bitmap);
-                views.push((lib_id.clone(), None, lib_mask.clone()));
+            self.libraries_cache
+                .get(library)
+                .unwrap_or(&empty_bitmap)
+                .clone()
+        };
 
-                let allowed_filters = if lib_def.allowed_filters.is_empty() {
-                    lib_def.filters.clone()
-                } else {
-                    lib_def.allowed_filters.clone()
-                };
-
-                for filter_id in allowed_filters {
-                    if let Some(f_mask) = self.filters_cache.get(&filter_id) {
-                        let view_mask = lib_mask & f_mask;
-                        views.push((lib_id.clone(), Some(filter_id), view_mask));
-                    }
-                }
-            }
+        if let Some(f_name) = filter
+            && let Some(f_mask) = self.filters_cache.get(f_name)
+        {
+            library_mask & f_mask
+        } else {
+            library_mask
         }
-
-        views
     }
 
-    fn build_grouper_items(
+    pub(crate) fn build_grouper_items(
         &self,
         lua_engine: Option<&libdale::lua::LuaEngine>,
         grouper_id: &str,
@@ -498,42 +492,6 @@ impl LogicEngine {
         assemble_grouper_tree(raw_nodes, order)
     }
 
-    fn precompute_views_for_target(
-        &mut self,
-        lua_engine: Option<&libdale::lua::LuaEngine>,
-        lib_id: &str,
-        filter_opt: Option<&str>,
-        view_mask: &RoaringBitmap,
-    ) {
-        let allowed_groupers: Vec<String> =
-            self.manifest.libraries.get(lib_id).map_or_else(
-                || self.manifest.groupers.keys().cloned().collect(),
-                |l| {
-                    if l.allowed_groupers.is_empty() {
-                        if l.groupers.is_empty() {
-                            self.manifest.groupers.keys().cloned().collect()
-                        } else {
-                            l.groupers.clone()
-                        }
-                    } else {
-                        l.allowed_groupers.clone()
-                    }
-                },
-            );
-
-        for grouper_id in allowed_groupers {
-            let final_list = self.build_grouper_items(lua_engine, &grouper_id, view_mask);
-            self.precomputed_groups.insert(
-                (
-                    lib_id.to_string(),
-                    filter_opt.map(ToString::to_string),
-                    grouper_id,
-                ),
-                final_list,
-            );
-        }
-    }
-
     fn populate_groupers_cache(&mut self) {
         self.collect_raw_groupers();
 
@@ -545,17 +503,6 @@ impl LogicEngine {
         }
 
         self.propagate_global_parent_unions(lua_engine.as_ref());
-
-        let views = self.collect_library_views();
-
-        for (lib_id, filter_opt, view_mask) in &views {
-            self.precompute_views_for_target(
-                lua_engine.as_ref(),
-                lib_id,
-                filter_opt.as_deref(),
-                view_mask,
-            );
-        }
     }
 
     fn populate_shelves_cache(&mut self) {
