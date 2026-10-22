@@ -8,7 +8,7 @@ use axum::http::StatusCode;
 use axum::response::{IntoResponse, Response};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
-use std::path::PathBuf;
+use std::path::{Path as StdPath, PathBuf};
 use std::sync::Arc;
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -143,7 +143,7 @@ pub async fn trigger_full_reset(State(state): State<Arc<AppState>>) -> Response 
         let scanner = crate::server::library::scanner::Library::new(music_directory);
         let mut logic = logic_arc.blocking_write();
         scanner.scan(&mut logic);
-        (logic.dict.len(), logic.manifest.clone())
+        (logic.albums.len(), logic.manifest.clone())
     })
     .await
     .unwrap_or_else(|_| (0, libdale::lua::LogicManifest::default()));
@@ -220,7 +220,7 @@ pub async fn force_update_album(
 ) -> Response {
     let path_opt = {
         let logic = state.logic.read().await;
-        logic.path_by_id.get(&id).cloned()
+        logic.get_album_path(&id).map(StdPath::to_path_buf)
     };
 
     if let Some(path) = path_opt {
@@ -256,13 +256,13 @@ pub async fn run_query(
     let ids = logic.find_ids(q_str);
     let mut results = Vec::new();
     for id in ids {
-        if let Some(path) = logic.path_by_id.get(&id)
-            && let Some(json_str) = logic.get_album_json(&id)
-            && let Ok(lock_json) = serde_json::from_str::<serde_json::Value>(&json_str)
+        if let Some(record) = logic.get_album_record(&id)
+            && let Ok(lock_json) =
+                serde_json::from_str::<serde_json::Value>(&record.raw_json)
         {
             results.push(json!({
                 "id": id,
-                "path": path,
+                "path": record.path,
                 "lock": lock_json,
             }));
         }

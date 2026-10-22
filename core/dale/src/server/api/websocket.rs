@@ -26,7 +26,7 @@ async fn build_init_payload(state: &AppState) -> String {
             );
         }
         (
-            l.dict.clone(),
+            l.dict_snapshot(),
             l.track_lookup.clone(),
             l.manifest.clone(),
             s,

@@ -31,7 +31,7 @@ async fn resolve_playing_target(state: &AppState) -> Option<String> {
         .await
         .ok()?;
     let canon = dir.canonicalize().unwrap_or(dir);
-    logic.albums_by_path.get(&canon).cloned()
+    logic.get_album_id_by_path(&canon).map(ToString::to_string)
 }
 
 async fn resolve_param_target(
@@ -54,17 +54,17 @@ async fn resolve_param_target(
             .map_or_else(|| music_dir, |dir| libdale::utils::expand_path(dir));
         let root_canon = root.canonicalize().unwrap_or(root);
         return logic
-            .albums_by_path
-            .iter()
-            .filter(|(p, _)| p.starts_with(&root_canon))
-            .map(|(_, id)| id.clone())
+            .albums
+            .values()
+            .filter(|a| a.path.starts_with(&root_canon))
+            .map(|a| a.id.clone())
             .collect();
     }
     if let Some(dir) = params.get("directory") {
         let p = libdale::utils::expand_path(dir);
         let p_canon = p.canonicalize().unwrap_or(p);
-        if let Some(id) = logic.albums_by_path.get(&p_canon) {
-            return vec![id.clone()];
+        if let Some(id) = logic.get_album_id_by_path(&p_canon) {
+            return vec![id.to_string()];
         }
     }
     Vec::new()
@@ -84,12 +84,12 @@ async fn resolve_target_entries(
     let logic = state.logic.read().await;
     let mut list = Vec::new();
     for target_id in target_ids {
-        if let Some(path) = logic.path_by_id.get(&target_id)
-            && let Some(json_str) = logic.get_album_json(&target_id)
-            && let Ok(lock_json) = serde_json::from_str::<serde_json::Value>(&json_str)
+        if let Some(record) = logic.get_album_record(&target_id)
+            && let Ok(lock_json) =
+                serde_json::from_str::<serde_json::Value>(&record.raw_json)
         {
             list.push(TargetAlbumEntry {
-                path: path.clone(),
+                path: record.path.clone(),
                 lock: lock_json,
             });
         }

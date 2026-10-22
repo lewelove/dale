@@ -89,10 +89,13 @@ async fn log_detected_events(
         paths
             .iter()
             .filter_map(|p| {
-                logic.albums_by_path.get(p).cloned().or_else(|| {
-                    let rel = libdale::resolvers::rel_path(p, &music_directory);
-                    if rel.is_empty() { None } else { Some(rel) }
-                })
+                logic
+                    .get_album_id_by_path(p)
+                    .map(ToString::to_string)
+                    .or_else(|| {
+                        let rel = libdale::resolvers::rel_path(p, &music_directory);
+                        if rel.is_empty() { None } else { Some(rel) }
+                    })
             })
             .collect()
     };
@@ -234,16 +237,16 @@ fn remove_vanished_albums(
     outcome: &mut IngestOutcome,
 ) {
     let dead_paths: Vec<PathBuf> = logic
-        .albums_by_path
-        .keys()
+        .albums
+        .values()
+        .map(|a| a.path.clone())
         .filter(|path| {
             vanished_paths.iter().any(|vanished| {
                 path.starts_with(vanished)
-                    || (vanished.starts_with(*path)
+                    || (vanished.starts_with(path)
                         && !path.join("metadata.toml").exists())
             })
         })
-        .cloned()
         .collect();
 
     for dead_path in dead_paths {
@@ -281,8 +284,10 @@ fn ingest_recompiled_items(
                 Ok(()) => {
                     deps_graph.update_album_deps(album_path, dependencies);
                     outcome.deps_modified = true;
-                    if let Some(entry) = logic.dict.get(&album_id).cloned() {
-                        outcome.updated_dict_entries.insert(album_id, entry);
+                    if let Some(entry) = logic.get_album_dict(&album_id) {
+                        outcome
+                            .updated_dict_entries
+                            .insert(album_id, (*entry).clone());
                     }
                 }
                 Err(e) => {

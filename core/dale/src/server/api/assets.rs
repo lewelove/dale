@@ -356,8 +356,9 @@ fn collect_matching_addresses(
     let name_filter: Option<HashSet<&str>> =
         names.map(|arr| arr.iter().map(String::as_str).collect());
 
-    for album in logic.dict.values() {
-        let Some(covers) = album.get("covers").and_then(Value::as_object) else {
+    for record in logic.albums.values() {
+        let Some(covers) = record.dict_entry.get("covers").and_then(Value::as_object)
+        else {
             continue;
         };
 
@@ -563,7 +564,11 @@ pub async fn get_album_metadata(
         logic.get_album_json(&id)
     };
     if let Some(data) = json_opt {
-        return ([(header::CONTENT_TYPE, "application/json")], data).into_response();
+        return (
+            [(header::CONTENT_TYPE, "application/json")],
+            data.to_string(),
+        )
+            .into_response();
     }
     StatusCode::NOT_FOUND.into_response()
 }
@@ -574,9 +579,10 @@ pub async fn get_album_cover(
 ) -> Response {
     let path_opt = {
         let logic = state.logic.read().await;
-        let album_dir = logic.path_by_id.get(&id).cloned();
-        logic.dict.get(&id).and_then(|meta| {
-            let cp = meta
+        let album_dir = logic.get_album_path(&id).map(StdPath::to_path_buf);
+        logic.get_album_record(&id).and_then(|record| {
+            let cp = record
+                .dict_entry
                 .get("cover_path")
                 .and_then(|v| v.as_str())
                 .unwrap_or("cover.jpg");

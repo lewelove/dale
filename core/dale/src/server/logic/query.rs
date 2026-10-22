@@ -27,15 +27,15 @@ impl LogicEngine {
                 let needle = fv.to_lowercase();
                 let mut searched = RoaringBitmap::new();
                 for uid in &final_mask {
-                    if let Some(id) = self.uid_to_id.get(&uid)
-                        && let Some(album) = self.dict.get(id)
-                    {
-                        let title = album
+                    if let Some(record) = self.albums.get(&uid) {
+                        let title = record
+                            .dict_entry
                             .get("album")
                             .and_then(Value::as_str)
                             .unwrap_or("")
                             .to_lowercase();
-                        let artist = album
+                        let artist = record
+                            .dict_entry
                             .get("albumartist")
                             .and_then(Value::as_str)
                             .unwrap_or("")
@@ -55,13 +55,13 @@ impl LogicEngine {
             }
         }
 
-        let fallback_storage = self.uid_to_id.keys().copied().collect::<Vec<_>>();
+        let fallback_storage = self.albums.keys().copied().collect::<Vec<_>>();
         let sorted_uids = self.orders_cache.get(sort).unwrap_or(&fallback_storage);
 
         let mut res: Vec<String> = sorted_uids
             .iter()
             .filter(|uid| final_mask.contains(**uid))
-            .filter_map(|uid| self.uid_to_id.get(uid).cloned())
+            .filter_map(|uid| self.albums.get(uid).map(|a| a.id.clone()))
             .collect();
 
         if order == SortOrder::Reverse {
@@ -104,7 +104,7 @@ impl LogicEngine {
         }
 
         uids.iter()
-            .filter_map(|uid| self.uid_to_id.get(uid).cloned())
+            .filter_map(|uid| self.albums.get(uid).map(|a| a.id.clone()))
             .collect()
     }
 
@@ -128,49 +128,49 @@ impl LogicEngine {
     pub fn find_ids(&self, query_str: &str) -> Vec<String> {
         let q = query_str.trim();
         if q.is_empty() {
-            return self.uid_to_id.values().cloned().collect();
+            return self.albums.values().map(|a| a.id.clone()).collect();
         }
 
         if let Some(uids) = self.libraries_cache.get(q) {
             return uids
                 .iter()
-                .filter_map(|uid| self.uid_to_id.get(&uid).cloned())
+                .filter_map(|uid| self.albums.get(&uid).map(|a| a.id.clone()))
                 .collect();
         }
         if let Some(uids) = self.filters_cache.get(q) {
             return uids
                 .iter()
-                .filter_map(|uid| self.uid_to_id.get(&uid).cloned())
+                .filter_map(|uid| self.albums.get(&uid).map(|a| a.id.clone()))
                 .collect();
         }
         if let Some(uids) = self.shelves_cache.get(q) {
             return uids
                 .iter()
-                .filter_map(|uid| self.uid_to_id.get(uid).cloned())
+                .filter_map(|uid| self.albums.get(uid).map(|a| a.id.clone()))
                 .collect();
         }
 
         let needle = q.to_lowercase();
-        self.uid_to_id
+        self.albums
             .values()
-            .filter_map(|id| {
-                if let Some(album) = self.dict.get(id) {
-                    let title = album
-                        .get("album")
-                        .and_then(Value::as_str)
-                        .unwrap_or("")
-                        .to_lowercase();
-                    let artist = album
-                        .get("albumartist")
-                        .and_then(Value::as_str)
-                        .unwrap_or("")
-                        .to_lowercase();
-                    if id.to_lowercase().contains(&needle)
-                        || title.contains(&needle)
-                        || artist.contains(&needle)
-                    {
-                        return Some(id.clone());
-                    }
+            .filter_map(|record| {
+                let title = record
+                    .dict_entry
+                    .get("album")
+                    .and_then(Value::as_str)
+                    .unwrap_or("")
+                    .to_lowercase();
+                let artist = record
+                    .dict_entry
+                    .get("albumartist")
+                    .and_then(Value::as_str)
+                    .unwrap_or("")
+                    .to_lowercase();
+                if record.id.to_lowercase().contains(&needle)
+                    || title.contains(&needle)
+                    || artist.contains(&needle)
+                {
+                    return Some(record.id.clone());
                 }
                 None
             })

@@ -1,4 +1,4 @@
-use super::{LogicEngine, SortKey, SortOrder, value_to_sort_key};
+use super::{AlbumRecord, LogicEngine, SortKey, SortOrder, value_to_sort_key};
 use libdale::lua::{FormattedGrouperResult, GrouperFormatContext};
 use roaring::RoaringBitmap;
 use serde_json::{Value, json};
@@ -55,14 +55,14 @@ struct RawGrouperNode {
 
 fn calculate_mask_metrics(
     mask: &RoaringBitmap,
-    album_metrics: &HashMap<u32, (u64, u64, u64)>,
+    albums: &HashMap<u32, AlbumRecord>,
 ) -> (u64, u64, u64) {
     let (mut dur, mut trk, mut dsc) = (0u64, 0u64, 0u64);
     for uid in mask {
-        if let Some(&(d, t, dc)) = album_metrics.get(&uid) {
-            dur += d;
-            trk += t;
-            dsc += dc;
+        if let Some(record) = albums.get(&uid) {
+            dur += record.duration_ms;
+            trk += record.total_tracks;
+            dsc += record.total_discs;
         }
     }
     (dur, trk, dsc)
@@ -116,7 +116,7 @@ fn discover_parent_hierarchy(
     grouper_id: &str,
     node_bitmaps: &mut HashMap<String, RoaringBitmap>,
     view_total: f64,
-    album_metrics: &HashMap<u32, (u64, u64, u64)>,
+    albums: &HashMap<u32, AlbumRecord>,
     lua_engine: Option<&libdale::lua::LuaEngine>,
 ) -> HashMap<String, String> {
     let mut parent_links: HashMap<String, String> = HashMap::new();
@@ -131,7 +131,7 @@ fn discover_parent_hierarchy(
         let direct_mask = node_bitmaps.get(&current_val).cloned().unwrap_or_default();
         let count = direct_mask.len();
         let pct = calculate_pct(count, view_total);
-        let (dur, trk, dsc) = calculate_mask_metrics(&direct_mask, album_metrics);
+        let (dur, trk, dsc) = calculate_mask_metrics(&direct_mask, albums);
 
         let fmt_ctx = GrouperFormatContext {
             value: &current_val,
@@ -194,7 +194,7 @@ fn build_raw_grouper_nodes(
     grouper_id: &str,
     node_bitmaps: &HashMap<String, RoaringBitmap>,
     view_total: f64,
-    album_metrics: &HashMap<u32, (u64, u64, u64)>,
+    albums: &HashMap<u32, AlbumRecord>,
     lua_engine: Option<&libdale::lua::LuaEngine>,
 ) -> Vec<RawGrouperNode> {
     let mut raw_nodes: Vec<RawGrouperNode> = Vec::new();
@@ -206,7 +206,7 @@ fn build_raw_grouper_nodes(
         }
 
         let pct = calculate_pct(count, view_total);
-        let (dur, trk, dsc) = calculate_mask_metrics(node_bm, album_metrics);
+        let (dur, trk, dsc) = calculate_mask_metrics(node_bm, albums);
 
         let fmt_ctx = GrouperFormatContext {
             value: node_val,
@@ -420,7 +420,7 @@ impl LogicEngine {
 
         if self.manifest.libraries.is_empty() {
             let mut all_uids = RoaringBitmap::new();
-            for &uid in self.uid_to_id.keys() {
+            for &uid in self.albums.keys() {
                 all_uids.insert(uid);
             }
             views.push(("library".to_string(), None, all_uids));
@@ -481,7 +481,7 @@ impl LogicEngine {
             grouper_id,
             &mut node_bitmaps,
             view_total,
-            &self.album_metrics,
+            &self.albums,
             lua_engine,
         );
 
@@ -491,7 +491,7 @@ impl LogicEngine {
             grouper_id,
             &node_bitmaps,
             view_total,
-            &self.album_metrics,
+            &self.albums,
             lua_engine,
         );
 

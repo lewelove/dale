@@ -4,6 +4,7 @@ use axum::Json;
 use axum::extract::{Path, Query, State};
 use axum::response::{IntoResponse, Response};
 use serde_json::{Value, json};
+use std::path::Path as StdPath;
 use std::sync::Arc;
 
 pub async fn play_album(
@@ -94,7 +95,7 @@ async fn get_tracks_internal(
     let (json_str, album_dir) = {
         let logic = state.logic.read().await;
         let json_opt = logic.get_album_json(id);
-        let path_opt = logic.path_by_id.get(id).cloned();
+        let path_opt = logic.get_album_path(id).map(StdPath::to_path_buf);
         drop(logic);
         (json_opt, path_opt)
     };
