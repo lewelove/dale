@@ -142,7 +142,7 @@ def main():
     parser = argparse.ArgumentParser(description="Standardize track file names from metadata.")
     parser.add_argument("--path", required=True, type=Path, help="Target album directory")
     parser.add_argument("-y", "--auto", action="store_true", help="Apply renames without confirmation")
-    parser.add_argument("--server-url", type=str, default="http://127.0.0.1:8000", help="Dale server API URL")
+    parser.add_argument("--server-url", type=str, default="http://127.0.0.1:8000", help="Datamile server API URL")
 
     args = parser.parse_args()
     target_dir = args.path.resolve()

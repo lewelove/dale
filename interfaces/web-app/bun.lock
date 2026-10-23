@@ -3,7 +3,7 @@
   "configVersion": 1,
   "workspaces": {
     "": {
-      "name": "@dale/web-app",
+      "name": "@datamile/web-app",
       "dependencies": {
         "uuid": "^14.0.1",
       },

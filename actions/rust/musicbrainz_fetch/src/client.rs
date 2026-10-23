@@ -5,7 +5,7 @@ use std::time::Duration;
 
 const RATE_LIMIT_DELAY: Duration = Duration::from_millis(1050);
 const RETRY_DELAY: Duration = Duration::from_millis(1500);
-const USER_AGENT: &str = "Dale/0.1.0 (https://github.com/lewelove/dale)";
+const USER_AGENT: &str = "Datamile/0.1.0 (https://github.com/lewelove/datamile)";
 const BROWSE_LIMIT: usize = 100;
 
 pub struct MusicBrainzClient {

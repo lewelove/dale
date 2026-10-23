@@ -29,7 +29,7 @@ fn expand_path(path_str: &str) -> PathBuf {
 fn main() {
     let config_path = dirs::home_dir()
         .expect("Failed to find home directory")
-        .join(".config/dale/config.toml");
+        .join(".config/datamile/config.toml");
 
     let config_content = fs::read_to_string(&config_path).expect("Failed to read config.toml");
     let config: Config = toml::from_str(&config_content).expect("Failed to parse config.toml");

@@ -1,8 +1,8 @@
 [workspace]
 
 members = [
-  "core/libdale",
-  "core/dale",
+  "core/libdatamile",
+  "core/datamile",
   "actions/rust/libactions",
   "actions/rust/calculate_cover_metrics",
   "actions/rust/collect",
@@ -29,7 +29,7 @@ fn_params_excessive_bools = "deny"
 
 [workspace.dependencies]
 
-libdale = { path = "core/libdale" }
+libdatamile = { path = "core/libdatamile" }
 libactions = { path = "actions/rust/libactions" }
 
 alphanumeric-sort = "1.5.5"

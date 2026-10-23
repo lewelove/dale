@@ -82,7 +82,7 @@ fn write_history_toml(data: &AlbumData, path: &Path) -> Result<()> {
     let album_escaped = escape_toml_string(&data.album);
     let date_escaped = escape_toml_string(&data.date);
     let content = format!(
-        "[album]\n\nalbumartist = \"{artist_escaped}\"\nalbum = \"{album_escaped}\"\ndate = \"{date_escaped}\"\n\ndate_added_dale = {now}\n"
+        "[album]\n\nalbumartist = \"{artist_escaped}\"\nalbum = \"{album_escaped}\"\ndate = \"{date_escaped}\"\n\ndate_added_datamile = {now}\n"
     );
     fs::write(path, content)?;
     Ok(())

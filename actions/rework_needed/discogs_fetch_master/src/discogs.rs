@@ -11,7 +11,7 @@ impl DiscogsFetcher {
     pub fn new() -> Result<Self> {
         let token = std::env::var("DISCOGS_TOKEN").unwrap_or_default();
         let client = Client::builder()
-            .user_agent("Dale/0.1.0")
+            .user_agent("Datamile/0.1.0")
             .build()
             .context("Failed to build HTTP client")?;
         Ok(Self { client, token })

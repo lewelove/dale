@@ -59,7 +59,7 @@ pub async fn fetch_discogs_release(id: u64) -> Result<Release> {
 pub async fn download_discogs_cover(url: &str, dest: &Path) -> Result<()> {
     let token = std::env::var("DISCOGS_TOKEN").unwrap_or_default();
     let client = reqwest::Client::builder()
-        .user_agent("Dale/0.1.0")
+        .user_agent("Datamile/0.1.0")
         .build()?;
     let mut req = client.get(url);
     if !token.is_empty() {

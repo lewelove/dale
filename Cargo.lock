@@ -685,7 +685,13 @@ dependencies = [
 ]
 
 [[package]]
-name = "dale"
+name = "data-encoding"
+version = "2.11.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "4583a4551df46e2792f82ceeac45e850d2e2d5debba0b91f102385cda5b11f06"
+
+[[package]]
+name = "datamile"
 version = "0.1.0"
 dependencies = [
  "alphanumeric-sort",
@@ -701,7 +707,7 @@ dependencies = [
  "image",
  "indexmap",
  "indicatif",
- "libdale",
+ "libdatamile",
  "log",
  "mpd_client",
  "notify",
@@ -721,12 +727,6 @@ dependencies = [
  "walkdir",
  "xxhash-rust",
 ]
-
-[[package]]
-name = "data-encoding"
-version = "2.11.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4583a4551df46e2792f82ceeac45e850d2e2d5debba0b91f102385cda5b11f06"
 
 [[package]]
 name = "deranged"
@@ -1711,7 +1711,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3eaf3ede3fee6db1a4c2ee091bf8a8b4dccdc6d17f656fb07896ee72867612f2"
 
 [[package]]
-name = "libdale"
+name = "libdatamile"
 version = "0.1.0"
 dependencies = [
  "alphanumeric-sort",

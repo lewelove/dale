@@ -94,7 +94,7 @@ impl ApplicationHandler for App {
         }
 
         let window_attributes = Window::default_attributes()
-            .with_title("Dale Shader Viewer")
+            .with_title("Datamile Shader Viewer")
             .with_inner_size(winit::dpi::LogicalSize::new(1000.0, 1000.0));
 
         let template = ConfigTemplateBuilder::new().with_alpha_size(8);

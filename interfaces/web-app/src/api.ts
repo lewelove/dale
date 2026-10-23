@@ -1,6 +1,6 @@
 export function getSocketUrl(): string {
   const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
-  const host = import.meta.env.VITE_DALE_HOST || "127.0.0.1:8000";
+  const host = import.meta.env.VITE_DATAMILE_HOST || "127.0.0.1:8000";
   return `${protocol}//${host}/ws`;
 }
 

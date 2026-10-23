@@ -47,7 +47,7 @@ pub async fn execute_musicbrainz(
     data: &mut AlbumData,
 ) -> Result<()> {
     let client = Client::builder()
-        .user_agent("Dale/0.1.0 https://github.com/lewelove/dale")
+        .user_agent("Datamile/0.1.0 https://github.com/lewelove/datamile")
         .build()
         .context("Failed to build HTTP client")?;
 

@@ -137,7 +137,7 @@ def main():
     parser.add_argument("--path", required=True, type=Path, help="Target album directory")
     parser.add_argument("--token", type=str, help="Genius access token")
     parser.add_argument("--playing-file", type=str, help="Currently playing track relative path")
-    parser.add_argument("--server-url", type=str, default="http://127.0.0.1:8000", help="Dale server API URL")
+    parser.add_argument("--server-url", type=str, default="http://127.0.0.1:8000", help="Datamile server API URL")
 
     args = parser.parse_args()
     target_dir = args.path.resolve()

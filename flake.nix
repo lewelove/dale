@@ -1,5 +1,5 @@
 {
-  description = "Dale Development Environment";
+  description = "Datamile Development Environment";
 
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";

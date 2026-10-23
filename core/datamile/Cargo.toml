@@ -1,0 +1,52 @@
+[package]
+name = "datamile"
+version = "0.1.0"
+edition = "2024"
+description = "Datamile: Data-driven Album Library Engine."
+license = "AGPL-3.0-only"
+repository = "https://github.com/lewelove/datamile"
+readme = "../../README.md"
+keywords = ["mpd", "music", "metadata", "audio", "server"]
+categories = ["multimedia::audio"]
+
+[lints]
+workspace = true
+
+[[bin]]
+name = "datamile"
+path = "src/main.rs"
+
+[dependencies]
+libdatamile = { workspace = true }
+
+alphanumeric-sort = { workspace = true }
+anyhow = { workspace = true }
+axum = { workspace = true }
+base64 = { workspace = true }
+blake3 = { workspace = true }
+chrono = { workspace = true }
+clap = { workspace = true }
+dirs = { workspace = true }
+fast_image_resize = { workspace = true }
+futures = { workspace = true }
+image = { workspace = true }
+indexmap = { workspace = true }
+indicatif = { workspace = true }
+log = { workspace = true }
+mpd_client = { workspace = true }
+notify = { workspace = true }
+rand = { workspace = true }
+rayon = { workspace = true }
+regex = { workspace = true }
+reqwest = { workspace = true, features = ["query"] }
+roaring = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+simple_logger = { workspace = true }
+thiserror = { workspace = true }
+tokio = { workspace = true }
+toml = { workspace = true }
+tower-http = { workspace = true }
+urlencoding = { workspace = true }
+walkdir = { workspace = true }
+xxhash-rust = { workspace = true }

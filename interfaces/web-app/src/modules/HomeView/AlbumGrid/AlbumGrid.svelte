@@ -118,7 +118,7 @@ function getTextCanvas(
   cCtx.fillStyle = canvasColors.bg;
   cCtx.fillRect(0, 0, coverSize, textBlockHeight);
 
-  const fontStack = "'Inter Dale', 'Noto Sans', system-ui, sans-serif";
+  const fontStack = "'Inter Datamile', 'Noto Sans', system-ui, sans-serif";
 
   cCtx.fillStyle = canvasColors.title;
   cCtx.globalAlpha = 1.0;

@@ -13,8 +13,8 @@ const patch = function () { this.destroy(); };
   }
 });
 
-const targetUrl = process.env.DALE_SERVER_URL || 'http://127.0.0.1:8000';
-const wsTargetUrl = process.env.DALE_WS_URL || 'ws://127.0.0.1:8000';;
+const targetUrl = process.env.DATAMILE_SERVER_URL || 'http://127.0.0.1:8000';
+const wsTargetUrl = process.env.DATAMILE_WS_URL || 'ws://127.0.0.1:8000';;
 
 const proxyConfig = {
   '/api': {
