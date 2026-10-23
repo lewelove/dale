@@ -1,6 +1,6 @@
-# Datamile: Data-driven Album Library Engine
+# Datamile
 
-**Datamile** is an MPD client and album-centric music library engine built from the first Unix Philosophy principles for archivist-minded collectors. It brings full Lua scriptability, plain-text data management, and Ahead-Of-Time library compilation guarantees to your album collection.
+**Datamile** is a data-driven media library engine built from the first Unix Philosophy principles for archivist-minded collectors. It uses compiler architecture to manage library's metadata, and brings full Lua scriptability, plain-text data management, and Ahead-Of-Time library compilation guarantees to your album collection. Currently it focuses only on collection of music albums, being an MPD client.
 
 > This README and all documentation were written by me, the developer, with my own hands, on a physical keyboard, in my own words. Thank you for reading it.
 
@@ -10,7 +10,7 @@
 
 ### Principles
 
-- **The album as the fundamental unit.** This project focuses solely on collection and management of music albums. The point, I guess, is to bring back the feeling of physical collecting to the digital world. The importance of the album for this project reflects how you collect music in real life.
+- **The album as the fundamental unit.** This project focuses solely on collection and management of music albums (for now). The point, I guess, is to bring back the feeling of physical collecting to the digital world. The importance of the album for this project reflects how you collect music in real life.
 - **Immutable audio / Mutable metadata.** Audio files making up the album should be a bit-perfect preservation of the original media. Audio files are inherently static. Your metadata is inherently dynamic. The engine treats audio as a read-only source. Everything mutable is expected to exist as ancillary files alongside it.
 - **Power to the User.** The entire creative vision of this project was conceived around a stance: you should not be bound by your collection interface choices. Every active decision made for this project reflects it.
 
@@ -32,7 +32,7 @@ The reasons behind architecture choices are a few cool features they unlock:
 
 ## Examples of Why This Architecture Is Incredible
 
-Here are the few raw power examples of this architecture based on concrete use cases for my actual album collection:
+Here are the few powerful examples of this architecture being used, based on concrete use cases from my actual album collection:
 
 ### Fetch Raw Data Once — Consume Forever
 
